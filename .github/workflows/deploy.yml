@@ -1,0 +1,32 @@
+name: Deploy to server
+
+# Auto-deploy whenever code lands on master (and allow manual runs).
+on:
+  push:
+    branches: [ master ]
+  workflow_dispatch:
+
+# Never run two deploys at once; let an in-flight deploy finish.
+concurrency:
+  group: deploy-master
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy over SSH
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          password: ${{ secrets.SSH_PASSWORD }}
+          port: ${{ secrets.SSH_PORT || 22 }}
+          script: |
+            set -e
+            cd "${{ secrets.DEPLOY_PATH }}"
+            echo "→ Fetching latest master…"
+            git fetch --all --prune
+            git reset --hard origin/master
+            echo "→ Running server deploy steps…"
+            bash deploy.sh
