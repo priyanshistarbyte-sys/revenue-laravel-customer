@@ -24,6 +24,8 @@
 @php
     // 10.00 → "10%", 12.50 → "12.5%"
     $pctLabel = fn($p) => rtrim(rtrim(number_format((float) $p, 2), '0'), '.') . '%';
+    $totShare = $totGAM * $sharePct / 100;
+    $totRest  = $totGAM - $totShare;
 @endphp
 
 <!-- KPI Cards -->
@@ -37,12 +39,12 @@
         <div class="kpi-value green">{{ fmtINR($totGAM) }}</div>
     </div>
     <div class="kpi-card">
-        <div class="kpi-label"><i class="bi bi-pie-chart"></i> Share</div>
-        <div class="kpi-value gold">{{ $pctLabel($sharePct) }}</div>
+        <div class="kpi-label"><i class="bi bi-pie-chart"></i> Share ({{ $pctLabel($sharePct) }})</div>
+        <div class="kpi-value gold">{{ fmtINR($totShare) }}</div>
     </div>
     <div class="kpi-card">
-        <div class="kpi-label"><i class="bi bi-pie-chart-fill"></i> Remaining</div>
-        <div class="kpi-value white">{{ $pctLabel($restPct) }}</div>
+        <div class="kpi-label"><i class="bi bi-pie-chart-fill"></i> Remaining ({{ $pctLabel($restPct) }})</div>
+        <div class="kpi-value white">{{ fmtINR($totRest) }}</div>
     </div>
     <div class="kpi-card" title="{{ number_format($totClicks) }} clicks / {{ number_format($totImpr) }} impressions">
         <div class="kpi-label"><i class="bi bi-cursor"></i> GAM CTR</div>
@@ -68,8 +70,8 @@
                     <th data-sort="num">GAM Rev ($) <span class="sort-btn">⇅</span></th>
                     <th data-sort="num">GAM Rev (₹) <span class="sort-btn">⇅</span></th>
                     <th data-sort="num">CTR <span class="sort-btn">⇅</span></th>
-                    <th>Share %</th>
-                    <th>Remaining %</th>
+                    <th data-sort="num" title="Your share of GAM revenue (₹)">{{ $pctLabel($sharePct) }} <span class="sort-btn">⇅</span></th>
+                    <th data-sort="num" title="Remaining GAM revenue (₹)">{{ $pctLabel($restPct) }} <span class="sort-btn">⇅</span></th>
                 </tr>
             </thead>
             <tbody>
@@ -85,13 +87,19 @@
                     <td class="c-muted" data-v="0">$0.00</td>
                     <td class="c-muted" data-v="0">₹0.00</td>
                     <td class="c-muted" data-v="">—</td>
+                    <td class="c-muted" data-v="0">₹0.00</td>
+                    <td class="c-muted" data-v="0">₹0.00</td>
                     @else
+                    @php
+                        $shareAmt = $r['gamINR'] * $sharePct / 100;
+                        $restAmt  = $r['gamINR'] - $shareAmt;
+                    @endphp
                     <td class="c-green" style="font-size:11px" data-v="{{ $r['gamUSD'] ?? 0 }}">${{ number_format($r['gamUSD'] ?? 0, 2) }}</td>
                     <td class="c-green" data-v="{{ $r['gamINR'] }}">{{ fmtINR($r['gamINR']) }}</td>
                     <td data-v="{{ $r['ctr'] ?? '' }}" title="{{ number_format($r['gamClicks']) }} clicks / {{ number_format($r['gamImpr']) }} impressions">{{ $r['ctr'] !== null ? number_format($r['ctr'], 2) . '%' : '—' }}</td>
+                    <td class="c-gold" data-v="{{ $shareAmt }}">{{ fmtINR($shareAmt) }}</td>
+                    <td data-v="{{ $restAmt }}">{{ fmtINR($restAmt) }}</td>
                     @endif
-                    <td class="c-gold">{{ $pctLabel($sharePct) }}</td>
-                    <td>{{ $pctLabel($restPct) }}</td>
                 </tr>
             @empty
                 <tr><td colspan="6" style="text-align:center;color:var(--text-muted);padding:30px">No sites are assigned to your account yet.</td></tr>
@@ -104,8 +112,8 @@
                     <td class="c-green" style="font-size:11px">${{ number_format($totGAMusd, 2) }}</td>
                     <td class="c-green">{{ fmtINR($totGAM) }}</td>
                     <td>{{ $totCtr !== null ? number_format($totCtr, 2) . '%' : '—' }}</td>
-                    <td class="c-gold">{{ $pctLabel($sharePct) }}</td>
-                    <td>{{ $pctLabel($restPct) }}</td>
+                    <td class="c-gold">{{ fmtINR($totShare) }}</td>
+                    <td>{{ fmtINR($totRest) }}</td>
                 </tr>
             </tfoot>
             @endif
