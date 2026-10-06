@@ -62,6 +62,6 @@ class AuthController extends Controller
     public function logout()
     {
         customerLogout();
-        return redirect('/customer/login');
+        return redirect('/login');
     }
 }

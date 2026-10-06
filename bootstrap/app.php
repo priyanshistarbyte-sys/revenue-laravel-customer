@@ -20,7 +20,7 @@ return Application::configure(basePath: dirname(__DIR__))
         // The original Amaira used no CSRF tokens; all POST endpoints are
         // behind PIN auth. Exempt them so the ported forms and app.js keep working.
         $middleware->validateCsrfTokens(except: [
-            'login', 'save_value', 'delete_data',
+            'admin/login', 'save_value', 'delete_data',
             'domains', 'links', 'expenses', 'accounts', 'adx',
             'currencies', 'settings', 'users', 'roles', 'invoices', 'invoices/*',
             'upload', 'gam_check', 'meta_campaigns', 'meta_media_upload',

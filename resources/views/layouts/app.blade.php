@@ -126,7 +126,7 @@
                 <i class="bi bi-person-circle"></i> {{ currentUserName() }}
                 @if (isAdmin())<span class="admin-tag">ADMIN</span>@endif
             </span>
-            <a href="{{ url('/logout') }}" class="nav-btn nav-btn-lock nav-btn-icon" title="Lock session" aria-label="Lock session">
+            <a href="{{ url('/admin/logout') }}" class="nav-btn nav-btn-lock nav-btn-icon" title="Lock session" aria-label="Lock session">
                 <i class="bi bi-lock"></i>
             </a>
         </div>

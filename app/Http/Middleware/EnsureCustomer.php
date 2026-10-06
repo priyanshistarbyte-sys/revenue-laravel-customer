@@ -35,7 +35,7 @@ class EnsureCustomer
 
         if (!$ok) {
             customerLogout();
-            return redirect('/customer/login');
+            return redirect('/login');
         }
 
         return $next($request);

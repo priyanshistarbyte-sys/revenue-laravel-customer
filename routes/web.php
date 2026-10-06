@@ -33,15 +33,15 @@ use Illuminate\Support\Facades\Route;
 */
 
 // ── Public ──
-Route::match(['get', 'post'], '/login', [AuthController::class, 'login'])->name('login');
-Route::get('/logout', [AuthController::class, 'logout'])->name('logout');
+// Customers sign in at /login (the site's front door); staff use /admin/login.
+Route::match(['get', 'post'], '/login', [\App\Http\Controllers\Customer\AuthController::class, 'login'])->name('customer.login');
+Route::get('/logout', [\App\Http\Controllers\Customer\AuthController::class, 'logout'])->name('customer.logout');
+Route::match(['get', 'post'], '/admin/login', [AuthController::class, 'login'])->name('login');
+Route::get('/admin/logout', [AuthController::class, 'logout'])->name('logout');
 Route::match(['get', 'post'], '/setup', [SetupController::class, 'run'])->name('setup');
 
 // ── Customer panel (ID + password, separate from the staff PIN login) ──
 Route::prefix('customer')->group(function () {
-    Route::match(['get', 'post'], '/login', [\App\Http\Controllers\Customer\AuthController::class, 'login'])->name('customer.login');
-    Route::get('/logout', [\App\Http\Controllers\Customer\AuthController::class, 'logout'])->name('customer.logout');
-
     Route::middleware('auth.customer')->group(function () {
         Route::redirect('/', '/customer/reports/site-wise')->name('customer.home');
         Route::get('/reports/site-wise', [\App\Http\Controllers\Customer\ReportsController::class, 'siteWise'])->name('customer.reports.site-wise');

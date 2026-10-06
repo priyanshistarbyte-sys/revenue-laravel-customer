@@ -40,7 +40,7 @@
     </div>
     @endif
 
-    <form method="post" action="{{ url('/customer/login') }}" {!! $lockLeft > 0 ? 'style="opacity:.4;pointer-events:none"' : '' !!}>
+    <form method="post" action="{{ url('/login') }}" {!! $lockLeft > 0 ? 'style="opacity:.4;pointer-events:none"' : '' !!}>
         @csrf
         <label class="login-label" for="login_id">ID</label>
         <input type="text" name="login_id" id="login_id" class="login-input" value="{{ $loginId }}"

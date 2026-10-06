@@ -56,7 +56,7 @@
     </div>
     @endif
 
-    <form method="post" action="{{ url('/login') }}" id="pinForm" {!! $lockSecondsLeft > 0 ? 'style="opacity:.4;pointer-events:none"' : '' !!}>
+    <form method="post" action="{{ url('/admin/login') }}" id="pinForm" {!! $lockSecondsLeft > 0 ? 'style="opacity:.4;pointer-events:none"' : '' !!}>
         @csrf
         @if ($mode === 'setup')
         <p style="text-align:center;color:var(--text-muted);font-size:11px;margin:0 0 4px">Your Name</p>
@@ -90,7 +90,7 @@
 
         <p style="text-align:center;color:var(--text-muted);font-size:11px;margin-top:14px">
             @if ($mode === 'verify2')
-                <a href="{{ url('/login?restart=1') }}" style="color:#a78bfa;text-decoration:none">← Start over</a>
+                <a href="{{ url('/admin/login?restart=1') }}" style="color:#a78bfa;text-decoration:none">← Start over</a>
                 · Expires in {{ (int)($PIN2_PENDING_TTL / 60) }} min
             @else
                 Session stays unlocked for 3 hours.

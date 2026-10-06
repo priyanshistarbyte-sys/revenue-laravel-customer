@@ -33,7 +33,7 @@ class AuthController extends Controller
         // Restart step-2 flow
         if ($request->has('restart')) {
             session()->forget(['pending_uid', 'pending_at']);
-            return redirect('/login');
+            return redirect('/admin/login');
         }
 
         if (session('pending_uid') && (time() - (int) session('pending_at', 0)) > self::PIN2_PENDING_TTL) {
@@ -92,7 +92,7 @@ class AuthController extends Controller
                     session(['login_fails' => 0]);
                     if (needsSecondPin($user)) {
                         session(['pending_uid' => (int) $user['id'], 'pending_at' => time()]);
-                        return redirect('/login'); // GET → renders step 2
+                        return redirect('/admin/login'); // GET → renders step 2
                     }
                     authLogin($user);
                     return redirect($this->popRedirect());
@@ -115,7 +115,7 @@ class AuthController extends Controller
     public function logout()
     {
         authLogout();
-        return redirect('/login');
+        return redirect('/admin/login');
     }
 
     private function popRedirect(): string

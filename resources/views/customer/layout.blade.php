@@ -50,8 +50,8 @@
             <span class="nav-btn nav-user-badge" title="Signed in as {{ currentCustomerName() }}">
                 <i class="bi bi-person-circle"></i> {{ currentCustomerName() }}
             </span>
-            <a href="{{ url('/customer/logout') }}" class="nav-btn nav-btn-lock nav-btn-icon" title="Sign out" aria-label="Sign out">
-                <i class="bi bi-box-arrow-right"></i>
+            <a href="{{ url('/logout') }}" class="nav-btn nav-btn-lock nav-btn-icon" title="Sign out" aria-label="Sign out">
+                <i class="bi bi-lock"></i>
             </a>
         </div>
         </div><!-- /offcanvas-body -->
