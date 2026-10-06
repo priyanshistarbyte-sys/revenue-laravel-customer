@@ -17,7 +17,7 @@ class AuthController extends Controller
     public function login(Request $request)
     {
         if (customerAuthenticated()) {
-            return redirect('/customer');
+            return redirect('/reports/site-wise');
         }
 
         $error    = null;
@@ -41,7 +41,7 @@ class AuthController extends Controller
                 session()->forget(['customer_fails', 'customer_lock_until']);
                 session()->regenerate();
                 customerLogin($customer);
-                return redirect('/customer');
+                return redirect('/reports/site-wise');
             }
 
             $fails = (int) session('customer_fails', 0) + 1;

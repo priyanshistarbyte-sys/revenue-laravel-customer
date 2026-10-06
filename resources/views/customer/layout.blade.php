@@ -19,7 +19,7 @@
 @endphp
 <nav class="navbar navbar-dark navbar-main">
     <div class="container-fluid">
-        <a class="navbar-brand fw-bold" href="{{ url('/customer') }}">
+        <a class="navbar-brand fw-bold" href="{{ url('/reports/site-wise') }}">
             <i class="bi bi-graph-up-arrow me-2"></i>Amaira
         </a>
         <button class="nav-toggle" type="button" data-bs-toggle="offcanvas" data-bs-target="#navSidebar"
@@ -40,9 +40,9 @@
                     <i class="bi bi-bar-chart-line"></i> Report
                 </a>
                 <ul class="dropdown-menu nav-dropdown-menu">
-                    <li><a class="dropdown-item {{ $active==='site-wise' ? 'active':'' }}" href="{{ url('/customer/reports/site-wise') }}"><i class="bi bi-globe2"></i> Site Wise</a></li>
-                    <li><a class="dropdown-item {{ $active==='hourly-wise' ? 'active':'' }}" href="{{ url('/customer/reports/hourly-wise') }}"><i class="bi bi-clock-history"></i> Hourly Wise</a></li>
-                    <li><a class="dropdown-item {{ $active==='country-wise' ? 'active':'' }}" href="{{ url('/customer/reports/country-wise') }}"><i class="bi bi-flag"></i> Country Wise</a></li>
+                    <li><a class="dropdown-item {{ $active==='site-wise' ? 'active':'' }}" href="{{ url('/reports/site-wise') }}"><i class="bi bi-globe2"></i> Site Wise</a></li>
+                    <li><a class="dropdown-item {{ $active==='hourly-wise' ? 'active':'' }}" href="{{ url('/reports/hourly-wise') }}"><i class="bi bi-clock-history"></i> Hourly Wise</a></li>
+                    <li><a class="dropdown-item {{ $active==='country-wise' ? 'active':'' }}" href="{{ url('/reports/country-wise') }}"><i class="bi bi-flag"></i> Country Wise</a></li>
                 </ul>
             </div>
         </div>

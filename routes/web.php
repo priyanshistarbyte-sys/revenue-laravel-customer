@@ -41,13 +41,11 @@ Route::get('/admin/logout', [AuthController::class, 'logout'])->name('logout');
 Route::match(['get', 'post'], '/setup', [SetupController::class, 'run'])->name('setup');
 
 // ── Customer panel (ID + password, separate from the staff PIN login) ──
-Route::prefix('customer')->group(function () {
-    Route::middleware('auth.customer')->group(function () {
-        Route::redirect('/', '/customer/reports/site-wise')->name('customer.home');
-        Route::get('/reports/site-wise', [\App\Http\Controllers\Customer\ReportsController::class, 'siteWise'])->name('customer.reports.site-wise');
-        Route::get('/reports/hourly-wise', [\App\Http\Controllers\Customer\ReportsController::class, 'hourlyWise'])->name('customer.reports.hourly-wise');
-        Route::get('/reports/country-wise', [\App\Http\Controllers\Customer\ReportsController::class, 'countryWise'])->name('customer.reports.country-wise');
-    });
+Route::middleware('auth.customer')->group(function () {
+    Route::redirect('/reports', '/reports/site-wise')->name('customer.home');
+    Route::get('/reports/site-wise', [\App\Http\Controllers\Customer\ReportsController::class, 'siteWise'])->name('customer.reports.site-wise');
+    Route::get('/reports/hourly-wise', [\App\Http\Controllers\Customer\ReportsController::class, 'hourlyWise'])->name('customer.reports.hourly-wise');
+    Route::get('/reports/country-wise', [\App\Http\Controllers\Customer\ReportsController::class, 'countryWise'])->name('customer.reports.country-wise');
 });
 
 // ── Authenticated ──

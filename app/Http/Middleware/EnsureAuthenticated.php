@@ -43,7 +43,7 @@ class EnsureAuthenticated
             // The bare site root is the customer front door; every other staff
             // page sends the visitor to the admin PIN login and back afterwards.
             if ($request->path() === '/') {
-                return redirect(customerAuthenticated() ? '/customer' : '/login');
+                return redirect(customerAuthenticated() ? '/reports/site-wise' : '/login');
             }
             session(['redirect_after_login' => $request->getRequestUri()]);
             return redirect('/admin/login');
