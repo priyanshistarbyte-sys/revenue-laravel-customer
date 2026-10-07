@@ -20,18 +20,23 @@
 <div class="dash-header">
     <div>
         <div class="dash-title">ADLEDGER &nbsp;·&nbsp; {{ strtoupper($monthYear) }} &nbsp;·&nbsp; DAILY P&amp;L DASHBOARD</div>
+        @if (showMeta())
         <div class="dash-subtitle">META URL = expense (Meta Ads) &nbsp;·&nbsp; GAM URL = revenue (Google Ad Manager) &nbsp;·&nbsp; P/L = GAM Revenue − Meta Spend − GST</div>
+        @else
+        <div class="dash-subtitle">GAM URL = revenue (Google Ad Manager)</div>
+        @endif
     </div>
     <div class="date-picker-wrap">
-        @if (canSeeAllUsers())
-        <label><i class="bi bi-person"></i> User →</label>
-        <select id="userPicker" class="form-select js-user-filter" style="width:auto">
-            <option value="">All users</option>
-            @foreach (allUsers() as $uOpt)
-            <option value="{{ (int)$uOpt['id'] }}" {{ $viewUserId === (int)$uOpt['id'] ? 'selected' : '' }}>
-                {{ $uOpt['name'] }}{{ $uOpt['is_admin'] ? ' (admin)' : '' }}
+        @if (!empty($customerOptions))
+        <label><i class="bi bi-person-vcard"></i> Customer →</label>
+        <select id="customerPicker" class="form-select js-customer-filter" style="width:auto">
+            <option value="">All customers</option>
+            @foreach ($customerOptions as $cu)
+            <option value="{{ (int)$cu['id'] }}" {{ $customerFilter === (int)$cu['id'] ? 'selected' : '' }}>
+                {{ $cu['name'] }}{{ $cu['active'] ? '' : ' (inactive)' }}
             </option>
             @endforeach
+            <option value="none" {{ $customerFilter === 'none' ? 'selected' : '' }}>— No customer —</option>
         </select>
         @endif
         @if (!empty($adxOptions))
@@ -100,6 +105,7 @@
         <div class="kpi-label"><i class="bi bi-currency-rupee"></i> GAM Revenue</div>
         <div class="kpi-value green">{{ fmtINR($totGAM) }}</div>
     </div>
+    @if (showMeta())
     <div class="kpi-card">
         <div class="kpi-label"><i class="bi bi-megaphone"></i> Meta Spend</div>
         <div class="kpi-value orange">{{ fmtINR($totMeta) }}</div>
@@ -120,10 +126,12 @@
         <div class="kpi-label"><i class="bi bi-speedometer2"></i> Margin</div>
         <div class="kpi-value {{ $totMargin >= 0 ? 'green' : 'red' }}">{{ fmtPct($totMargin) }}</div>
     </div>
+    @endif
     <div class="kpi-card" title="{{ number_format($totClicks) }} clicks / {{ number_format($totImpr) }} impressions">
         <div class="kpi-label"><i class="bi bi-cursor"></i> GAM CTR</div>
         <div class="kpi-value white">{{ $totCtr !== null ? number_format($totCtr, 2) . '%' : '—' }}</div>
     </div>
+    @if (showMeta())
     <div class="kpi-card">
         <div class="kpi-label"><i class="bi bi-check-circle"></i> Profitable</div>
         <div class="kpi-value green">{{ $cntProfit }}</div>
@@ -132,6 +140,7 @@
         <div class="kpi-label"><i class="bi bi-x-circle"></i> Losing</div>
         <div class="kpi-value red">{{ $cntLoss }}</div>
     </div>
+    @endif
 </div>
 
 <!-- Main Table -->
@@ -145,10 +154,12 @@
                 title="Export all data, but the GAM URL column shows only the last GAM URL (full subdomain)">
             <i class="bi bi-globe2"></i> CSV (last GAM URL)
         </button>
+        @if (showMeta())
         <button type="button" class="btn-sm-custom" style="margin-left:8px" data-copy-meta-urls="dashTable"
                 title="Copy the Meta URL of every row shown (respects the Notes filter), one per line">
             <i class="bi bi-clipboard"></i> Copy Meta URLs
         </button>
+        @endif
         <span style="margin-left:12px;font-weight:400;font-size:11px;color:var(--text-muted)">USD/{{ getDefaultCurrency()['code'] }}: {{ number_format($usdRate, 2) }}</span>
     </div>
     <div class="table-wrap">
@@ -156,18 +167,24 @@
             <thead>
                 <tr>
                     <th data-sort="str" data-col="0">Entry Date <span class="sort-btn">⇅</span></th>
+                    @if (showMeta())
                     <th data-sort="str" data-col="1">META URL <span style="font-weight:400">(spend)</span> <span class="sort-btn">⇅</span></th>
+                    @endif
                     <th data-sort="str" data-col="2">GAM URL <span style="font-weight:400">(revenue)</span> <span class="sort-btn">⇅</span></th>
                     <th data-sort="str" data-col="3">ADX <span class="sort-btn">⇅</span></th>
                     <th data-sort="num" data-col="4">GAM Rev ($) <span class="sort-btn">⇅</span></th>
                     <th data-sort="num" data-col="5">GAM Revenue (₹) <span class="sort-btn">⇅</span></th>
+                    @if (showMeta())
                     <th data-sort="num" data-col="6">Meta Spend <span class="sort-btn">⇅</span></th>
                     <th data-sort="num" data-col="7">GST <span class="sort-btn">⇅</span></th>
                     <th data-sort="num" data-col="8">Total Cost <span class="sort-btn">⇅</span></th>
                     <th data-sort="num" data-col="9">Net P/L <span class="sort-btn">⇅</span></th>
                     <th data-sort="num" data-col="10">Margin <span class="sort-btn">⇅</span></th>
+                    @endif
                     <th data-sort="num" data-col="11">CTR <span class="sort-btn">⇅</span></th>
+                    @if (showMeta())
                     <th data-sort="str" data-col="12">Status <span class="sort-btn">⇅</span></th>
+                    @endif
                     @if (canSeeAllUsers())
                     <th data-sort="str" data-col="13">User <span class="sort-btn">⇅</span></th>
                     @endif
@@ -178,10 +195,10 @@
             <tbody>
             @foreach ($rows as $ri => $r)
                 @php
-                    $cls       = !$r['hasData'] ? 'row-nodata' : ($r['netPL'] >= 0 ? 'row-profit' : 'row-loss');
+                    $cls       = !$r['hasData'] ? 'row-nodata' : (!showMeta() ? '' : ($r['netPL'] >= 0 ? 'row-profit' : 'row-loss'));
                     $campaigns = array_values(array_filter(array_map('trim', explode(',', $r['link']['meta_campaign']))));
                     $gamSites  = $r['gamSites'];
-                    $multiCamp = count($r['campaignBreakdown']) > 1;
+                    $multiCamp = showMeta() && count($r['campaignBreakdown']) > 1;
                     $hasAny    = !empty(array_filter($r['campaignBreakdown'], fn($c) => $c['spend'] !== null));
                     $subRowId  = 'sub-' . $ri;
                 @endphp
@@ -192,17 +209,21 @@
                 data-user-id="{{ (int)($r['link']['user_id'] ?? 0) }}"
                 data-note="{{ trim((string)($r['link']['notes'] ?? '')) }}"
                 data-link-name="{{ $r['link']['link_name'] }}"
-                data-meta-url="{{ $r['link']['meta_url'] }}"
                 data-gam-sites="{{ json_encode($gamSites) }}"
-                data-meta-campaigns="{{ json_encode($campaigns) }}"
                 data-gam-usd="{{ number_format($r['gamUSD'] ?? 0, 6, '.', '') }}"
-                data-meta-spend="{{ number_format($r['spend'], 4, '.', '') }}">
+                @if (showMeta())
+                data-meta-campaigns="{{ json_encode($campaigns) }}"
+                data-meta-url="{{ $r['link']['meta_url'] }}"
+                data-meta-spend="{{ number_format($r['spend'], 4, '.', '') }}"
+                @endif>
 
                 <td style="color:#c4b5fd;font-size:11px;white-space:nowrap">
                     @php $entryDate = $r['link']['created_at'] ?? ''; @endphp
                     {{ $entryDate ? date('d M Y', strtotime($entryDate)) : '—' }}
                 </td>
+                @if (showMeta())
                 <td><a class="url-tag" href="{{ $r['link']['meta_url'] }}" target="_blank">{{ parse_url($r['link']['meta_url'], PHP_URL_HOST) ?: $r['link']['meta_url'] }}</a></td>
+                @endif
                 <td>
                     @foreach ($gamSites as $gs)
                     <span style="color:var(--text-muted);display:inline-block">{{ $gs }}</span>@if (count($gamSites) > 1)<br>@endif
@@ -222,21 +243,26 @@
                 @if (!$r['hasData'])
                 <td class="cell-gam-usd c-muted">$0.00</td>
                 <td class="cell-gam-inr c-muted">₹0.00</td>
+                @if (showMeta())
                 <td class="c-muted"><span class="cell-meta-spend">₹0.00</span><div class="cell-meta-usd" style="font-size:10px;color:var(--text-muted);font-weight:400"></div></td>
                 <td class="cell-gst c-muted">₹0.00</td>
                 <td class="cell-cost c-muted">₹0.00</td>
                 <td class="cell-netpl c-muted" style="font-weight:700">₹0.00</td>
                 <td class="cell-margin c-muted">—</td>
+                @endif
                 <td class="cell-ctr c-muted">—</td>
+                @if (showMeta())
                 <td class="cell-status">
                     <span class="badge-nodata">No data</span>
                     @if (!$r['link']['active'])
                     <span style="background:#2e1a1a;color:#f87171;border-radius:10px;font-size:9px;padding:1px 6px;margin-left:3px;vertical-align:middle">Inactive</span>
                     @endif
                 </td>
+                @endif
                 @else
                 <td class="cell-gam-usd c-green" style="font-size:11px">${{ number_format($r['gamUSD'] ?? 0, 2) }}</td>
                 <td class="cell-gam-inr c-green">{{ fmtINR($r['gamINR']) }}</td>
+                @if (showMeta())
                 <td class="c-orange {{ $multiCamp && $hasAny ? 'camp-toggle-cell' : '' }}"
                     @if ($multiCamp && $hasAny) data-target="{{ $subRowId }}" title="Click to view campaign breakdown" @endif>
                     <span class="cell-meta-spend">{{ fmtINR($r['spend']) }}</span>
@@ -249,13 +275,16 @@
                 <td class="cell-cost">{{ fmtINR($r['cost']) }}</td>
                 <td class="cell-netpl {{ $r['netPL'] >= 0 ? 'c-green' : 'c-red' }}" style="font-weight:700">{{ fmtINR($r['netPL']) }}</td>
                 <td class="cell-margin {{ ($r['margin'] !== null && $r['margin'] >= 0) ? 'c-green' : 'c-red' }}">{{ $r['margin'] !== null ? fmtPct($r['margin']) : '—' }}</td>
+                @endif
                 <td class="cell-ctr" title="{{ number_format($r['gamClicks']) }} clicks / {{ number_format($r['gamImpr']) }} impressions">{{ $r['ctr'] !== null ? number_format($r['ctr'], 2) . '%' : '—' }}</td>
+                @if (showMeta())
                 <td class="cell-status">
                     {!! $r['netPL'] >= 0 ? '<span class="badge-profit">✓ Profit</span>' : '<span class="badge-loss">✗ Loss</span>' !!}
                     @if (!$r['link']['active'])
                     <span style="background:#2e1a1a;color:#f87171;border-radius:10px;font-size:9px;padding:1px 6px;margin-left:3px;vertical-align:middle">Inactive</span>
                     @endif
                 </td>
+                @endif
                 @endif
 
                 @if (canSeeAllUsers())
@@ -279,7 +308,7 @@
                     <button type="button" class="btn-row-history" title="Last 30 days history">
                         <i class="bi bi-clock-history"></i>
                     </button>
-                    <button class="btn-row-edit" title="Edit GAM Revenue &amp; Meta Spend">
+                    <button class="btn-row-edit" title="{{ showMeta() ? 'Edit GAM Revenue & Meta Spend' : 'Edit GAM Revenue' }}">
                         <i class="bi bi-pencil-square"></i>
                     </button>
                 </td>
@@ -324,17 +353,21 @@
             </tbody>
             <tfoot>
                 <tr>
-                    <td colspan="3" style="text-align:left">TOTALS</td>
+                    <td colspan="{{ showMeta() ? 3 : 2 }}" style="text-align:left">TOTALS</td>
                     <td></td>
                     <td class="c-green" style="font-size:11px">${{ number_format($totGAMusd, 2) }}</td>
                     <td class="c-green">{{ fmtINR($totGAM) }}</td>
+                    @if (showMeta())
                     <td class="c-orange">{{ fmtINR($totMeta) }}<div class="cell-meta-usd" style="font-size:10px;color:var(--text-muted);font-weight:400">{{ fmtUsdFromInr($totMeta, $usdRate) }}</div></td>
                     <td class="c-gold">{{ fmtINR($totGST) }}</td>
                     <td>{{ fmtINR($totCost) }}</td>
                     <td class="{{ $totNetPL >= 0 ? 'c-green' : 'c-red' }}">{{ fmtINR($totNetPL) }}</td>
                     <td class="{{ $totMargin >= 0 ? 'c-green' : 'c-red' }}">{{ fmtPct($totMargin) }}</td>
+                    @endif
                     <td>{{ $totCtr !== null ? number_format($totCtr, 2) . '%' : '—' }}</td>
+                    @if (showMeta())
                     <td><span class="badge-profit">{{ $cntProfit }} Profit</span> <span class="badge-loss">{{ $cntLoss }} Loss</span></td>
+                    @endif
                     @if (canSeeAllUsers())<td></td>@endif
                     <td></td>
                     <td></td>
@@ -368,6 +401,7 @@
                             <input type="number" id="editGamUsd" class="form-control" min="0" step="0.01" placeholder="0.00" style="flex:1">
                         </div>
                     </div>
+                    @if (showMeta())
                     <div class="col-12">
                         <label class="form-label">Meta Spend (₹) <small style="color:var(--text-muted);font-weight:400">— INR amount from Meta Ads</small></label>
                         <div style="display:flex;align-items:center;gap:8px">
@@ -379,6 +413,7 @@
                             <input type="number" id="editMetaSpend" class="form-control" min="0" step="0.01" placeholder="0.00" style="flex:1">
                         </div>
                     </div>
+                    @endif
                 </div>
                 <div id="editModalError" style="display:none;margin-top:12px" class="alert-custom alert-error"></div>
             </div>
@@ -419,12 +454,14 @@
                                 <th>Date</th>
                                 <th>GAM Rev ($)</th>
                                 <th>GAM Revenue (₹)</th>
+                                @if (showMeta())
                                 <th>Meta Spend</th>
                                 <th>GST</th>
                                 <th>Total Cost</th>
                                 <th>Net P/L</th>
                                 <th>Margin</th>
                                 <th>Status</th>
+                                @endif
                             </tr>
                         </thead>
                         <tbody id="historyBody"></tbody>

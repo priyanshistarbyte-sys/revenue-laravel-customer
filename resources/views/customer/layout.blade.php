@@ -45,6 +45,9 @@
                     <li><a class="dropdown-item {{ $active==='country-wise' ? 'active':'' }}" href="{{ url('/reports/country-wise') }}"><i class="bi bi-flag"></i> Country Wise</a></li>
                 </ul>
             </div>
+            <a href="{{ url('/account') }}" class="nav-btn {{ $active==='account' ? 'active':'' }}">
+                <i class="bi bi-person-gear"></i> My Account
+            </a>
         </div>
         <div class="nav-user">
             <span class="nav-btn nav-user-badge" title="Signed in as {{ currentCustomerName() }}">

@@ -346,7 +346,9 @@
                                 </thead>
                                 <tbody>
                                 @php
-                                    $deployRows = ['meta' => ['host' => $l['meta_url'], 'label' => 'Meta URL']];
+                                    $deployRows = trim((string) $l['meta_url']) !== ''
+                                        ? ['meta' => ['host' => $l['meta_url'], 'label' => 'Meta URL']]
+                                        : [];
                                     foreach ($gamSites as $idx => $gs) {
                                         $deployRows[$idx] = ['host' => $gs, 'label' => null];
                                     }
@@ -490,6 +492,7 @@
                             </select>
                         </div>
                         @include('partials.new_domain_box', ['prefix' => 'add', 'adxOptions' => $adxOptions])
+                        @if (showMeta())
                         <div class="col-12">
                             <label class="form-label">
                                 Meta Campaign(s) *
@@ -504,7 +507,8 @@
                             <label class="form-label">Meta URL *</label>
                             <input type="text" name="meta_url" class="form-control" placeholder="ewire1.blogonbudget.xyz" required>
                         </div>
-                        <div class="col-md-6">
+                        @endif
+                        <div class="{{ showMeta() ? 'col-md-6' : 'col-12' }}">
                             <label class="form-label">
                                 GAM URL / Site Host(s) *
                                 <small style="color:#7dd3fc;font-weight:400;text-transform:none;letter-spacing:0">— exact match from GAM CSV; press <kbd>Enter</kbd> or <kbd>,</kbd> to add multiple</small>
@@ -521,7 +525,7 @@
                         <div class="col-12">
                             <label class="form-label">
                                 <i class="bi bi-hdd-network"></i> Create DNS records now
-                                <small style="color:#7dd3fc;font-weight:400;text-transform:none;letter-spacing:0">— optional: adds a name.com A record for the Meta URL and each GAM host, pointing at the chosen server, so DNS propagates before you deploy</small>
+                                <small style="color:#7dd3fc;font-weight:400;text-transform:none;letter-spacing:0">— optional: adds a name.com A record for {{ showMeta() ? 'the Meta URL and each GAM host' : 'each GAM host' }}, pointing at the chosen server, so DNS propagates before you deploy</small>
                             </label>
                             @if (empty($servers))
                                 <div style="font-size:12px;color:#fbbf24">
@@ -593,6 +597,7 @@
                             </select>
                         </div>
                         @include('partials.new_domain_box', ['prefix' => 'edit', 'adxOptions' => $adxOptions])
+                        @if (showMeta())
                         <div class="col-12">
                             <label class="form-label">
                                 Meta Campaign(s) *
@@ -610,7 +615,8 @@
                             <label class="form-label">Meta URL *</label>
                             <input type="text" name="meta_url" class="form-control" value="{{ $editLink['meta_url'] }}" required>
                         </div>
-                        <div class="col-md-6">
+                        @endif
+                        <div class="{{ showMeta() ? 'col-md-6' : 'col-12' }}">
                             <label class="form-label">
                                 GAM URL / Site Host(s) *
                                 <small style="color:#7dd3fc;font-weight:400;text-transform:none;letter-spacing:0">— press <kbd>Enter</kbd> or <kbd>,</kbd> to add multiple</small>

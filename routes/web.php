@@ -11,7 +11,6 @@ use App\Http\Controllers\GamCheckController;
 use App\Http\Controllers\LinksController;
 use App\Http\Controllers\MonthlyController;
 use App\Http\Controllers\SaveValueController;
-use App\Http\Controllers\AccountsController;
 use App\Http\Controllers\InvoicesController;
 use App\Http\Controllers\SettingsController;
 use App\Http\Controllers\RolesController;
@@ -46,6 +45,7 @@ Route::middleware('auth.customer')->group(function () {
     Route::get('/reports/site-wise', [\App\Http\Controllers\Customer\ReportsController::class, 'siteWise'])->name('customer.reports.site-wise');
     Route::get('/reports/hourly-wise', [\App\Http\Controllers\Customer\ReportsController::class, 'hourlyWise'])->name('customer.reports.hourly-wise');
     Route::get('/reports/country-wise', [\App\Http\Controllers\Customer\ReportsController::class, 'countryWise'])->name('customer.reports.country-wise');
+    Route::match(['get', 'post'], '/account', [\App\Http\Controllers\Customer\AccountController::class, 'index'])->name('customer.account');
 });
 
 // ── Authenticated ──
@@ -72,7 +72,6 @@ Route::middleware('auth.pin')->group(function () {
     Route::match(['get', 'post'], '/expenses', [ExpensesController::class, 'index'])->middleware('permission:expenses')->name('expenses');
     Route::match(['get', 'post'], '/adx', [AdxController::class, 'index'])->middleware('permission:adx')->name('adx');
     Route::match(['get', 'post'], '/currencies', [CurrenciesController::class, 'index'])->middleware('permission:currencies')->name('currencies');
-    Route::match(['get', 'post'], '/accounts', [AccountsController::class, 'index'])->middleware('permission:accounts')->name('accounts');
     Route::match(['get', 'post'], '/upload', [UploadController::class, 'index'])->middleware('permission:upload')->name('upload');
     Route::post('/delete_data', [UploadController::class, 'delete'])->middleware('permission:upload')->name('delete_data');
     Route::match(['get', 'post'], '/invoices', [InvoicesController::class, 'index'])->middleware('permission:invoices')->name('invoices');
@@ -81,8 +80,7 @@ Route::middleware('auth.pin')->group(function () {
     // Reachable from Upload and from the ADX page; the controller requires
     // 'upload.add' or 'adx.edit' before anything actually runs.
     Route::get('/gam_sync', [SyncController::class, 'gam'])->middleware('permission:upload|adx')->name('gam_sync');
-    Route::get('/meta_sync', [SyncController::class, 'meta'])->middleware('permission:upload|accounts')->name('meta_sync');
-    Route::get('/meta_assets_sync', [SyncController::class, 'metaAssets'])->middleware('permission:accounts')->name('meta_assets_sync');
+    Route::get('/meta_sync', [SyncController::class, 'meta'])->middleware('permission:upload')->name('meta_sync');
 
     // ── Users, roles & deployment masters ──
     Route::match(['get', 'post'], '/users', [UsersController::class, 'index'])->middleware('permission:users')->name('users');

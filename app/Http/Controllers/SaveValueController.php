@@ -19,7 +19,7 @@ class SaveValueController extends Controller
         $date      = $request->input('date', '');
         $gamSites  = json_decode($request->input('gam_sites', '[]'), true);
         $gamUsd    = $request->input('gam_usd', null);
-        $metaSpend = $request->input('meta_spend', null);
+        $metaSpend = showMeta() ? $request->input('meta_spend', null) : null;   // spend isn't editable while Meta is hidden
         $campaigns = json_decode($request->input('meta_campaigns', '[]'), true);
         if (!is_array($gamSites))  $gamSites  = [];
         if (!is_array($campaigns)) $campaigns = [];

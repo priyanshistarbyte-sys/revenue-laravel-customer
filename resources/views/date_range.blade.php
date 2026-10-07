@@ -10,19 +10,26 @@
         ['label' => 'Net P/L',    'key' => 'pl',   'render' => fn ($m) => fmtINR($m['pl']),   'cls' => fn ($m) => $m['pl'] >= 0 ? 'c-green' : 'c-red'],
         ['label' => 'Margin',     'key' => 'mgn',  'render' => fn ($m) => fmtPct($m['mgn']),  'cls' => fn ($m) => $m['mgn'] >= 0 ? 'c-green' : 'c-red'],
     ];
+    // Meta hidden: show GAM revenue instead (spend, P/L, margin and the campaign
+    // actions all come from Meta spend).
+    if (!showMeta()) {
+        $subCols = [
+            ['label' => 'GAM Revenue', 'key' => 'gam', 'render' => fn ($m) => fmtINR($m['gam']), 'cls' => fn ($m) => 'c-green'],
+        ];
+    }
     $nSub  = count($subCols);
-    $fixed = 4; // META URL, ACTION, GAM URL, ADX
+    $fixed = showMeta() ? 4 : 2; // [META URL, ACTION,] GAM URL, ADX
 @endphp
 
 <style>
-    /* Freeze the META URL column while scrolling sideways through the dates. */
+    /* Freeze the first column while scrolling sideways through the dates. */
     #drGrid thead tr:first-child th:first-child,
     #drGrid tbody td:first-child,
     #drGrid tfoot td:first-child { position: sticky; left: 0; z-index: 2; box-shadow: inset -1px 0 0 var(--border); }
     #drGrid tbody td:first-child { background: var(--card-bg); }
     #drGrid thead tr:first-child th:first-child { z-index: 3; }
     #drGrid thead th { text-align: center; }
-    #drGrid thead tr:first-child th:nth-child(-n+4) { text-align: left; }
+    #drGrid thead tr:first-child th:nth-child(-n+{{ $fixed }}) { text-align: left; }
     #drGrid .grp-start { border-left: 1px solid #2e2e5a; }
 
     /* Daily action badges + filter chips */
@@ -105,6 +112,7 @@
         <span><i class="bi bi-table"></i> Link Performance — {{ $dl($from) }} to {{ $dl($to) }} ({{ count($dates) }} {{ count($dates) === 1 ? 'day' : 'days' }})</span>
         <span style="margin-left:auto;font-size:11px;color:var(--text-muted);font-weight:400">USD/{{ getDefaultCurrency()['code'] }}: {{ number_format($usdRate, 2) }}</span>
     </div>
+    @if (showMeta())
     <div class="act-chips" id="actChips">
         <span style="font-size:11px;color:var(--text-muted);margin-right:4px">
             <i class="bi bi-lightning-charge"></i> Actions for {{ $dl($actionDay) }} vs {{ $dl($prevDay) }}:
@@ -119,12 +127,15 @@
             @endif
         @endforeach
     </div>
+    @endif
     <div class="table-wrap" style="overflow-x:auto">
-        <table class="ledger" id="drGrid" style="min-width:{{ 600 + (count($dates) + 1) * 330 }}px">
+        <table class="ledger" id="drGrid" style="min-width:{{ (showMeta() ? 600 : 300) + (count($dates) + 1) * $nSub * 110 }}px">
             <thead>
                 <tr>
+                    @if (showMeta())
                     <th rowspan="2">META URL <small style="color:var(--text-muted)">(spend)</small></th>
                     <th rowspan="2" title="What to do, from {{ $dl($actionDay) }} vs {{ $dl($prevDay) }}">ACTION</th>
+                    @endif
                     <th rowspan="2">GAM URL <small style="color:var(--text-muted)">(revenue)</small></th>
                     <th rowspan="2">ADX</th>
                     @foreach ($dates as $di => $dt)
@@ -146,6 +157,7 @@
             <tbody>
             @forelse ($rows as $r)
             <tr class="{{ $r['has'] ? '' : 'row-nodata' }}" data-action="{{ $r['advice']['key'] }}">
+                @if (showMeta())
                 <td style="font-weight:600;color:#c4b5fd">
                     <a class="url-tag" href="{{ $r['meta_url'] }}" target="_blank">{{ $r['meta_url'] }}</a>
                 </td>
@@ -153,6 +165,7 @@
                     <span class="act-badge act-{{ $r['advice']['key'] }}">{{ $r['advice']['label'] }}</span>
                     <div class="act-note">{{ $r['advice']['note'] }}</div>
                 </td>
+                @endif
                 <td style="font-size:11px;color:var(--text-muted)">
                     @foreach (array_filter(array_map('trim', explode(',', $r['gam_url']))) as $gh)<div>{{ $gh }}</div>@endforeach
                 </td>
@@ -178,9 +191,7 @@
             <tfoot>
                 <tr>
                     <td>TOTALS</td>
-                    <td></td>
-                    <td></td>
-                    <td></td>
+                    @for ($i = 1; $i < $fixed; $i++)<td></td>@endfor
                     @foreach (array_merge(array_values($totByDate), [$grand]) as $m)
                         @foreach ($subCols as $si => $sc)
                         <td class="{{ $sc['cls']($m) }} {{ $si === 0 ? 'grp-start' : '' }}">{{ $sc['render']($m) }}</td>

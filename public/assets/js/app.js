@@ -124,7 +124,7 @@ document.addEventListener('DOMContentLoaded', () => {
         form.addEventListener('submit', e => {
             const camp = form.querySelector('[name="meta_campaign"]');
             const gam  = form.querySelector('[name="gam_url"]');
-            if (!camp || !camp.value.trim()) {
+            if (camp && !camp.value.trim()) {
                 e.preventDefault();
                 alert('Please add at least one Meta campaign name.');
             } else if (!gam || !gam.value.trim()) {
@@ -151,6 +151,16 @@ document.querySelectorAll('.js-user-filter').forEach(function (sel) {
         const url = new URL(window.location.href);
         if (this.value) url.searchParams.set('user', this.value);
         else url.searchParams.delete('user');
+        window.location.href = url.toString();
+    });
+});
+
+// ── Customer filter navigation (dashboard) ──
+document.querySelectorAll('.js-customer-filter').forEach(function (sel) {
+    sel.addEventListener('change', function () {
+        const url = new URL(window.location.href);
+        if (this.value) url.searchParams.set('customer', this.value);
+        else url.searchParams.delete('customer');
         window.location.href = url.toString();
     });
 });
@@ -282,11 +292,37 @@ document.querySelectorAll('[data-confirm]').forEach(el => {
     const el    = id => document.getElementById(id);
     const esc   = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
     const sign  = v => v === null ? 'c-muted' : (v >= 0 ? 'c-green' : 'c-red');
+    const showMeta = document.documentElement.dataset.showMeta === '1';
     let seq = 0; // ignore responses from an earlier click
+
+    // Meta hidden: revenue only — no spend, cost, P/L, margin or profit/loss status.
+    function renderRevenueOnly(data) {
+        const t = data.total;
+        el('historySummary').innerHTML =
+            `<div class="history-kpi"><div class="history-kpi-label">GAM Revenue</div><div class="history-kpi-value c-green">${esc(t.gam_fmt)}</div></div>`;
+        el('historyBody').innerHTML = data.rows.map(r => r.has_data
+            ? `<tr>
+                   <td>${esc(r.label)}</td>
+                   <td class="c-green">${esc(r.gam_usd_fmt)}</td>
+                   <td class="c-green">${esc(r.gam_fmt)}</td>
+               </tr>`
+            : `<tr class="row-nodata">
+                   <td>${esc(r.label)}</td>
+                   <td colspan="2" class="c-muted" style="text-align:center">No data</td>
+               </tr>`
+        ).join('');
+        el('historyFoot').innerHTML =
+            `<tr>
+                 <td>TOTAL</td>
+                 <td class="c-green">${esc(t.gam_usd_fmt)}</td>
+                 <td class="c-green">${esc(t.gam_fmt)}</td>
+             </tr>`;
+    }
 
     function render(data) {
         const t = data.total;
         el('historyRange').textContent = data.range;
+        if (!showMeta) return renderRevenueOnly(data);
 
         el('historySummary').innerHTML = [
             ['GAM Revenue', t.gam_fmt, 'c-green'],
@@ -412,10 +448,10 @@ document.querySelectorAll('[data-confirm]').forEach(el => {
 
         linkNameEl.textContent   = activeRow.dataset.linkName || '';
         currentGamEl.textContent = '$' + gamUsd.toFixed(2);
-        currentMetaEl.textContent= '₹' + spend.toLocaleString('en-IN', {minimumFractionDigits:2, maximumFractionDigits:2});
+        if (currentMetaEl) currentMetaEl.textContent = '₹' + spend.toLocaleString('en-IN', {minimumFractionDigits:2, maximumFractionDigits:2});
 
         gamInput.value  = gamUsd  > 0 ? gamUsd.toFixed(2)  : '';
-        metaInput.value = spend   > 0 ? spend.toFixed(2)   : '';
+        if (metaInput) metaInput.value = spend > 0 ? spend.toFixed(2) : '';
         clearError();
         modal.show();
 
@@ -429,7 +465,7 @@ document.querySelectorAll('[data-confirm]').forEach(el => {
         clearError();
 
         const gamVal  = gamInput.value.trim();
-        const metaVal = metaInput.value.trim();
+        const metaVal = metaInput ? metaInput.value.trim() : '';
 
         if (gamVal === '' && metaVal === '') {
             showError('Enter at least one value to save.'); return;
@@ -449,7 +485,7 @@ document.querySelectorAll('[data-confirm]').forEach(el => {
                 date           : activeRow.dataset.date,
                 user_id        : activeRow.dataset.userId || '',
                 gam_sites      : activeRow.dataset.gamSites,
-                meta_campaigns : activeRow.dataset.metaCampaigns,
+                meta_campaigns : activeRow.dataset.metaCampaigns || '[]',
                 gam_usd        : gamVal  !== '' ? gamVal  : '',
                 meta_spend     : metaVal !== '' ? metaVal : '',
             });
@@ -468,7 +504,15 @@ document.querySelectorAll('[data-confirm]').forEach(el => {
             activeRow.querySelector('.cell-gam-inr').textContent  = data.gam_inr_fmt;
             activeRow.querySelector('.cell-gam-inr').className     = 'cell-gam-inr c-green';
 
+            activeRow.dataset.gamUsd = data.gam_usd;
+
+            // Meta hidden: the spend / cost / P&L cells aren't on the page.
             const spendCell = activeRow.querySelector('.cell-meta-spend');
+            if (!spendCell) {
+                activeRow.classList.remove('row-nodata');
+                modal.hide();
+                return;
+            }
             spendCell.textContent = data.spend_fmt;
             spendCell.className   = 'cell-meta-spend c-orange';
 
@@ -537,7 +581,7 @@ document.querySelectorAll('[data-confirm]').forEach(el => {
         // Block sort while any cell is being edited
         if (table.querySelector('.cell-editing')) return;
 
-        const col  = parseInt(th.dataset.col, 10);
+        const col  = th.cellIndex;
         const type = th.dataset.sort;
 
         sortDir = (sortCol === col) ? sortDir * -1 : (type === 'num' ? -1 : 1);

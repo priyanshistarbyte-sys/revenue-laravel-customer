@@ -8,7 +8,7 @@ use Illuminate\Http\Request;
 
 /**
  * Web endpoints for the GAM / Meta API syncs — the counterparts of the buttons
- * on the ADX, Accounts and Upload pages (originally gam_sync.php / meta_sync.php).
+ * on the ADX and Upload pages (originally gam_sync.php / meta_sync.php).
  * Admin only. Diagnostic listings return plain text; a normal run redirects back
  * with a flash message.
  */
@@ -54,8 +54,8 @@ class SyncController extends Controller
 
     public function meta(Request $request, MetaSync $sync)
     {
-        // Runnable from the Upload page (upload.add) or the Accounts page (accounts.edit).
-        if (!userCan('upload', 'add') && !userCan('accounts', 'edit')) {
+        // Runnable from the Upload page (upload.add).
+        if (!userCan('upload', 'add')) {
             abort(403, 'You do not have permission to run the Meta sync.');
         }
 
@@ -66,29 +66,7 @@ class SyncController extends Controller
         }
 
         $res = $sync->run($account, $request->has('force'));
-        return redirect('/accounts')->with('flash', ['type' => $res['ok'] ? 'success' : 'error', 'msg' => $res['msg']]);
-    }
-
-    /** Sync Meta ad accounts / pages / pixels + Creative-Hub media for the builder. */
-    public function metaAssets(Request $request, \App\Services\MetaAssetsSync $sync, \App\Services\MetaMediaSync $media)
-    {
-        if (!userCan('accounts', 'view')) {
-            abort(403, 'You do not have permission to sync Meta assets.');
-        }
-
-        // Diagnostic: /meta_assets_sync?diag=1 — shows why pages are/aren't syncing.
-        if ($request->has('diag')) {
-            return response($sync->diagnose((int) $request->query('account', 0)), 200)
-                ->header('Content-Type', 'text/plain; charset=utf-8');
-        }
-
-        $account = (int) $request->query('account', 0);
-        $res  = $sync->run($account);
-        $mres = $media->run($account);
-        return redirect('/accounts')->with('flash', [
-            'type' => ($res['ok'] || $mres['ok']) ? 'success' : 'error',
-            'msg'  => $res['msg'] . ' · ' . $mres['msg'],
-        ]);
+        return redirect('/upload')->with('flash', ['type' => $res['ok'] ? 'success' : 'error', 'msg' => $res['msg']]);
     }
 
     /**

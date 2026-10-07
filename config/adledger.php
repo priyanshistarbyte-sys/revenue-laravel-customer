@@ -11,8 +11,13 @@ return [
     'gam' => [
         'enabled'            => env('GAM_ENABLED', true),
         'lookback_days'      => (int) env('GAM_LOOKBACK_DAYS', 3),
-        'min_interval_hours' => (float) env('GAM_MIN_INTERVAL_HOURS', 3),
+        // Min gap between non-forced syncs. Under 1h so an hourly cron is never
+        // skipped (last-sync is stamped when a run ends, a bit after :00).
+        'min_interval_hours' => (float) env('GAM_MIN_INTERVAL_HOURS', 0.75),
         'cron_key'           => env('GAM_CRON_KEY', ''),
+        // Cron expression for the scheduled `gam:sync` (routes/console.php).
+        // Default: every hour on the hour. Empty = no scheduled sync.
+        'schedule'           => env('GAM_SYNC_CRON', '0 * * * *'),
         'currency'           => env('GAM_CURRENCY', 'USD'),
         'mock'               => env('GAM_MOCK', false),
         // Pull data straight from each GAM network: the app creates and runs its own
@@ -88,5 +93,8 @@ return [
         'api_version'        => env('META_API_VERSION', 'v21.0'),
         'results_action'     => env('META_RESULTS_ACTION', ''),
         'mock'               => env('META_MOCK', false),
+        // Show Meta campaigns + spend (and spend-based GST/cost/P&L/margin) in the
+        // staff UI. false hides the Meta Campaigns page and those report columns.
+        'show_in_ui'         => env('META_SHOW_IN_UI', false),
     ],
 ];

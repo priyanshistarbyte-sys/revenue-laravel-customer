@@ -7,7 +7,7 @@
 <div class="dash-header" style="margin-bottom:20px">
     <div>
         <div class="dash-title">UPLOAD DATA</div>
-        <div class="dash-subtitle">Upload your Meta Ads spend CSV and GAM revenue CSV files</div>
+        <div class="dash-subtitle">{{ showMeta() ? 'Upload your Meta Ads spend CSV and GAM revenue CSV files' : 'Upload your GAM revenue CSV files' }}</div>
     </div>
 </div>
 
@@ -16,7 +16,7 @@
     <div style="display:flex;align-items:center;gap:8px">
         <i class="bi bi-cloud-arrow-down" style="font-size:1.3rem;color:#a78bfa"></i>
         <div>
-            <div style="color:#fff;font-size:13px;font-weight:600">GAM API auto-sync <small style="color:var(--text-muted);font-weight:400">— pulls all GAM accounts every 3 hours (global)</small></div>
+            <div style="color:#fff;font-size:13px;font-weight:600">GAM API auto-sync <small style="color:var(--text-muted);font-weight:400">— pulls all GAM accounts every hour (global)</small></div>
             <div style="font-size:11px;color:var(--text-muted)">
                 <strong style="color:#c4b5fd">{{ $gamAcctCount }}</strong> active account{{ $gamAcctCount != 1 ? 's' : '' }}
                 · last sync: <strong style="color:#c4b5fd">{{ $gamLastSync ?: 'never' }}</strong>
@@ -34,6 +34,7 @@
 @endif
 
 <div class="row g-4">
+    @if (showMeta())
     <!-- Meta Upload -->
     <div class="col-md-6">
         <div class="upload-card">
@@ -100,9 +101,10 @@ ewire2,2026-06-04,active,...,1773.87,...</code>
         </div>
         @endif
     </div>
+    @endif
 
     <!-- GAM Upload -->
-    <div class="col-md-6">
+    <div class="{{ showMeta() ? 'col-md-6' : 'col-12' }}">
         <div class="upload-card">
             <h5 style="color:#00c853;margin-bottom:6px"><i class="bi bi-graph-up"></i> Google Ad Manager — Revenue CSV</h5>
             <p style="color:var(--text-muted);font-size:12px;margin-bottom:18px">
@@ -228,6 +230,7 @@ ew2.erpnewswire.com,2026-06-03,72.34,...</code>
 <div class="data-card" style="margin-top:8px">
     <div class="data-card-header" style="color:#ff7777"><i class="bi bi-trash3"></i> Danger Zone — Delete Data by Date</div>
     <div style="padding:16px;display:flex;gap:16px;flex-wrap:wrap">
+        @if (showMeta())
         <form method="post" action="{{ url('/delete_data') }}" style="display:flex;gap:8px;align-items:center">
             <input type="hidden" name="type" value="meta">
             <label class="form-label mb-0">Meta date:</label>
@@ -236,6 +239,7 @@ ew2.erpnewswire.com,2026-06-03,72.34,...</code>
                 <i class="bi bi-trash3"></i> Delete Meta
             </button>
         </form>
+        @endif
         <form method="post" action="{{ url('/delete_data') }}" style="display:flex;gap:8px;align-items:center">
             <input type="hidden" name="type" value="gam">
             <label class="form-label mb-0">GAM date:</label>

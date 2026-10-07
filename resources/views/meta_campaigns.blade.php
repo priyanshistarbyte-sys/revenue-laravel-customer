@@ -9,7 +9,6 @@
         <div class="dash-subtitle">Build campaigns in bulk, then publish to Meta. Draft-only for now — nothing is sent to Meta yet.</div>
     </div>
     <div style="margin-left:auto;display:flex;gap:8px;align-items:center">
-        <a href="{{ url('/accounts') }}" class="btn-sm-custom"><i class="bi bi-arrow-repeat"></i> Sync assets</a>
         <button type="button" id="mcPull" class="btn-sm-custom"><i class="bi bi-cloud-download"></i> Pull from Meta</button>
         <button type="button" id="mcCollapseAll" class="btn-sm-custom"><i class="bi bi-arrows-angle-contract"></i> Collapse all</button>
         <button type="button" id="mcAddRow" class="btn-sm-custom"><i class="bi bi-plus-lg"></i> Add row</button>
@@ -21,7 +20,7 @@
 @if (empty($adAccounts))
 <div style="background:rgba(251,191,36,.1);border:1px solid rgba(251,191,36,.35);color:#fbbf24;border-radius:10px;padding:12px 16px;margin-bottom:12px;font-size:12px">
     <i class="bi bi-exclamation-triangle-fill"></i> No Meta ad accounts synced yet — the Account/Page/Pixel dropdowns will be empty.
-    Add a Meta account with an API token on the <a href="{{ url('/accounts') }}" style="color:#a78bfa">Accounts</a> page, then click <strong>Sync assets</strong>.
+    Add a row to the <code>meta_accounts</code> table with an API token, then run <code>php artisan meta:assets-sync</code>.
 </div>
 @endif
 

@@ -413,8 +413,14 @@ class LinksController extends Controller
             $customerId   = $this->resolveCustomerId($pdo, $request);
             $metaCampaign = implode(',', array_filter(array_map('trim', explode(',', $request->input('meta_campaign', '')))));
             $linkName     = normalizeUrl(explode(',', $gamUrl)[0] ?? '');   // subdomain = first GAM host
-            if (!$metaCampaign || !$metaUrl || !$gamUrl) {
-                $flash = ['type' => 'error', 'msg' => 'Meta campaign, Meta URL and GAM URL are required.'];
+            if (!showMeta()) {
+                // Meta hidden: the form has no campaign / Meta URL fields.
+                $metaCampaign = $metaUrl = '';
+            }
+            if (!$gamUrl || (showMeta() && (!$metaCampaign || !$metaUrl))) {
+                $flash = ['type' => 'error', 'msg' => showMeta()
+                    ? 'Meta campaign, Meta URL and GAM URL are required.'
+                    : 'GAM URL is required.'];
             } else {
                 try {
                     $adxId    = $this->resolveAdxId($request);
@@ -440,7 +446,7 @@ class LinksController extends Controller
                     $dns  = $this->pointHostsAtServer(
                         $pdo,
                         (int) $dnsServerId,
-                        array_merge([$metaUrl], explode(',', $gamUrl))
+                        array_values(array_filter(array_merge([$metaUrl], explode(',', $gamUrl))))
                     );
                     $type = empty($dns['errors']) ? 'success' : 'warning';
                     $note = $autoNote . $dns['msg'] . ($dns['errors'] ? ' ' . implode(' ', $dns['errors']) : '');
@@ -519,7 +525,15 @@ class LinksController extends Controller
             $customerId   = $this->resolveCustomerId($pdo, $request);
             $metaCampaign = implode(',', array_filter(array_map('trim', explode(',', $request->input('meta_campaign', '')))));
             $linkName     = normalizeUrl(explode(',', $gamUrl)[0] ?? '');   // subdomain = first GAM host
-            if ($id && $metaCampaign && $metaUrl && $gamUrl) {
+            if (!showMeta() && $id) {
+                // Meta hidden: the form has no campaign / Meta URL fields — keep what's stored.
+                $keep = $pdo->prepare("SELECT meta_campaign, meta_url FROM links WHERE id = ? AND " . scopeSQL());
+                $keep->execute([$id]);
+                $kept = $keep->fetch() ?: [];
+                $metaCampaign = (string) ($kept['meta_campaign'] ?? '');
+                $metaUrl      = (string) ($kept['meta_url'] ?? '');
+            }
+            if ($id && $gamUrl && (!showMeta() || ($metaCampaign && $metaUrl))) {
                 try {
                     // If the GAM URL change alters the derived MAIN_URL, the deployed
                     // Meta sub-site is now stale → flag it so the UI prompts a re-deploy.

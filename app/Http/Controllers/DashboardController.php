@@ -25,26 +25,34 @@ class DashboardController extends Controller
         $usdRate = getCurrencyRate('USD');
         $gstRate = (float) getSetting('gst_rate', '18');
 
-        // ── User scoping ── (admins may filter by ?user=; everyone else follows their data_scope) ──
-        $viewUserId = canSeeAllUsers() ? (int) $request->query('user', 0) : 0;
-        $linkScope  = $viewUserId > 0 ? "l.user_id = $viewUserId" : linkScopeWhere('l', 'd');
+        // ── User scoping ── (everyone follows their data_scope) ──
+        $linkScope  = linkScopeWhere('l', 'd');
+
+        // ── Customer filter (?customer=<id>: links assigned to that customer; 'none' = unassigned) ──
+        $customerParam  = (string) $request->query('customer', '');
+        $customerFilter = $customerParam === 'none' ? 'none' : (int) $customerParam;
+        $customerWhere  = $customerFilter === 'none' ? ' AND l.customer_id IS NULL'
+                        : ($customerFilter > 0 ? " AND l.customer_id = $customerFilter" : '');
 
         // ── ADX network filter (matches a link's ADX via its domain, legacy col as fallback) ──
         $adxFilter = (int) $request->query('adx', 0);
         $adxWhere  = $adxFilter > 0 ? " AND COALESCE(d.adx_id, l.adx_id) = $adxFilter" : '';
 
-        $links = $metaRaw = $gamRaw = $datesRaw = $adxOptions = $domAdx = [];
+        $links = $metaRaw = $gamRaw = $datesRaw = $adxOptions = $domAdx = $customerOptions = [];
         $dbOk = true;
         $error = null;
 
         try {
             $pdo   = getDB();
             $adxOptions = adxOptionsForUser();
+            if (canSeeAllUsers()) {
+                $customerOptions = $pdo->query("SELECT id, name, active FROM customers ORDER BY name")->fetchAll();
+            }
             $links = $pdo->query("SELECT l.*, u.name AS owner_name
                                   FROM links l
                                   LEFT JOIN domains d ON d.id=l.domain_id
                                   LEFT JOIN users u ON u.id=l.user_id
-                                  WHERE $linkScope $adxWhere ORDER BY l.link_name")->fetchAll();
+                                  WHERE $linkScope $adxWhere $customerWhere ORDER BY l.link_name")->fetchAll();
 
             // Map of domain name → ADX name, used to resolve a link's ADX from its
             // GAM host (a link may map to several GAM sites / domains).
@@ -208,7 +216,7 @@ class DashboardController extends Controller
         $monthYear   = $dateObj->format('F Y');
 
         return view('dashboard', compact(
-            'pageTitle', 'activePage', 'date', 'usdRate', 'gstRate', 'viewUserId',
+            'pageTitle', 'activePage', 'date', 'usdRate', 'gstRate', 'customerOptions', 'customerFilter',
             'adxOptions', 'adxFilter',
             'rows', 'totGAMusd', 'totGAM', 'totMeta', 'totGST', 'totCost', 'totNetPL',
             'totMargin', 'totCtr', 'totImpr', 'totClicks', 'cntProfit', 'cntLoss', 'noteOptions', 'hasEmptyNote',

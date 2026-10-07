@@ -54,8 +54,11 @@
 
 <!-- Main Table -->
 <div class="data-card">
-    <div class="data-card-header">
-        <i class="bi bi-clock-history"></i> Hourly Performance &mdash; {{ $displayDate }}
+    <div class="data-card-header" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+        <span><i class="bi bi-clock-history"></i> Hourly Performance &mdash; {{ $displayDate }}</span>
+        @if ($rows)
+        <div style="margin-left:auto"><a href="{{ request()->fullUrlWithQuery(['export' => 'csv']) }}" class="btn-sm-custom"><i class="bi bi-download"></i> Export CSV</a></div>
+        @endif
     </div>
     <div class="table-wrap">
         <table class="ledger" id="hourTable">

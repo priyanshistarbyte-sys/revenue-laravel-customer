@@ -14,6 +14,11 @@
         ['label' => 'Net P/L',         'key' => 'pl',     'render' => fn ($m) => fmtINR($m['pl']),                     'cls' => fn ($m) => $m['pl'] >= 0 ? 'c-green' : 'c-red'],
         ['label' => 'Margin',          'key' => 'mgn',    'render' => fn ($m) => fmtPct($m['mgn']),                    'cls' => fn ($m) => $m['mgn'] >= 0 ? 'c-green' : 'c-red'],
     ];
+    // Meta hidden: GAM revenue only (spend, GST, cost, P/L and margin all come from Meta spend).
+    if (!showMeta()) {
+        $metricCols = array_values(array_filter($metricCols, fn ($mc) => in_array($mc['key'], ['gamUsd', 'gamInr'], true)));
+    }
+    $fixed = showMeta() ? 4 : 3; // [META URL,] GAM URL, ADX, ENTRY DATE
 
 @endphp
 
@@ -104,10 +109,10 @@
         <table class="ledger" style="min-width:1600px">
             <thead>
                 <tr>
-                    <th rowspan="2" style="text-align:left">META URL <small style="color:var(--text-muted)">(spend)</small></th>
+                    @if (showMeta())<th rowspan="2" style="text-align:left">META URL <small style="color:var(--text-muted)">(spend)</small></th>@endif
                     <th rowspan="2" style="text-align:left">GAM URL <small style="color:var(--text-muted)">(revenue)</small></th>
                     <th rowspan="2" style="text-align:left">ADX</th>
-                    <th rowspan="2" class="js-sort" data-col="3" style="text-align:left;cursor:pointer;user-select:none" title="Sort by entry date">ENTRY DATE <span class="js-arrow" style="opacity:.4">↕</span></th>
+                    <th rowspan="2" class="js-sort" data-col="{{ $fixed - 1 }}" style="text-align:left;cursor:pointer;user-select:none" title="Sort by entry date">ENTRY DATE <span class="js-arrow" style="opacity:.4">↕</span></th>
                     @foreach ($metricCols as $mc)
                     <th colspan="2" style="border-left:1px solid #2e2e5a">{{ $mc['label'] }}</th>
                     @endforeach
@@ -115,8 +120,8 @@
                 </tr>
                 <tr>
                     @foreach ($metricCols as $i => $mc)
-                    <th class="js-sort" data-col="{{ 4 + $i * 2 }}" style="font-size:10px;color:#c4b5fd;border-left:1px solid #2e2e5a;cursor:pointer;user-select:none" title="Sort by {{ $mc['label'] }} — {{ $dl($date1) }}">{{ $dl($date1) }} <span class="js-arrow" style="opacity:.4">↕</span></th>
-                    <th class="js-sort" data-col="{{ 4 + $i * 2 + 1 }}" style="font-size:10px;color:#7dd3fc;cursor:pointer;user-select:none" title="Sort by {{ $mc['label'] }} — {{ $dl($date2) }}">{{ $dl($date2) }} <span class="js-arrow" style="opacity:.4">↕</span></th>
+                    <th class="js-sort" data-col="{{ $fixed + $i * 2 }}" style="font-size:10px;color:#c4b5fd;border-left:1px solid #2e2e5a;cursor:pointer;user-select:none" title="Sort by {{ $mc['label'] }} — {{ $dl($date1) }}">{{ $dl($date1) }} <span class="js-arrow" style="opacity:.4">↕</span></th>
+                    <th class="js-sort" data-col="{{ $fixed + $i * 2 + 1 }}" style="font-size:10px;color:#7dd3fc;cursor:pointer;user-select:none" title="Sort by {{ $mc['label'] }} — {{ $dl($date2) }}">{{ $dl($date2) }} <span class="js-arrow" style="opacity:.4">↕</span></th>
                     @endforeach
                 </tr>
             </thead>
@@ -126,9 +131,11 @@
                     $gamHosts   = array_filter(array_map('trim', explode(',', $r['gam_url'])));
                 @endphp
             <tr class="{{ $r['has'] ? '' : 'row-nodata' }}">
+                @if (showMeta())
                 <td style="text-align:left;font-weight:600;color:#c4b5fd">
                     <a class="url-tag" href="{{ $r['meta_url'] }}" target="_blank">{{ $r['meta_url'] }}</a>
                 </td>
+                @endif
                 <td style="text-align:left;font-size:11px;color:var(--text-muted)">
                     @foreach ($gamHosts as $gh)<div>{{ $gh }}</div>@endforeach
                 </td>
@@ -149,12 +156,12 @@
                 </td>
             </tr>
             @empty
-                <tr><td colspan="{{ 4 + count($metricCols) * 2 + 1 }}" style="text-align:center;color:var(--text-muted);padding:30px">No links found.</td></tr>
+                <tr><td colspan="{{ $fixed + count($metricCols) * 2 + 1 }}" style="text-align:center;color:var(--text-muted);padding:30px">No links found.</td></tr>
             @endforelse
             </tbody>
             <tfoot>
                 <tr>
-                    <td colspan="4" style="text-align:left">TOTALS</td>
+                    <td colspan="{{ $fixed }}" style="text-align:left">TOTALS</td>
                     @foreach ($metricCols as $mc)
                     <td class="{{ $mc['cls']($t1) }}" style="border-left:1px solid #2e2e5a">{{ $mc['render']($t1) }}</td>
                     <td class="{{ $mc['cls']($t2) }}">{{ $mc['render']($t2) }}</td>

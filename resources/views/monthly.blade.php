@@ -11,7 +11,7 @@
         <a href="?year={{ $prevM->format('Y') }}&month={{ $prevM->format('n') }}{{ $userParam }}{{ $adxParam }}" class="btn-sm-custom">
             <i class="bi bi-chevron-left"></i>
         </a>
-        <h2>{{ strtoupper($monthName) }} — MONTHLY P&amp;L SUMMARY</h2>
+        <h2>{{ strtoupper($monthName) }} — MONTHLY {!! showMeta() ? 'P&amp;L' : 'REVENUE' !!} SUMMARY</h2>
         <a href="?year={{ $nextM->format('Y') }}&month={{ $nextM->format('n') }}{{ $userParam }}{{ $adxParam }}" class="btn-sm-custom">
             <i class="bi bi-chevron-right"></i>
         </a>
@@ -53,11 +53,13 @@
 <!-- KPI Summary Row -->
 <div class="kpi-row" style="margin-bottom:20px">
     <div class="kpi-card"><div class="kpi-label">Month GAM Revenue</div><div class="kpi-value green">{{ fmtINR($curGAM) }}</div></div>
+    @if (showMeta())
     <div class="kpi-card"><div class="kpi-label">Month Meta Spend</div><div class="kpi-value orange">{{ fmtINR($curMeta) }}</div><div style="font-size:11px;color:var(--text-muted);margin-top:2px">{{ fmtUsdFromInr($curMeta, $usdRate) }}</div></div>
     <div class="kpi-card"><div class="kpi-label">Month GST</div><div class="kpi-value gold">{{ fmtINR($curGST) }}</div></div>
     <div class="kpi-card"><div class="kpi-label">Month Total Cost</div><div class="kpi-value white">{{ fmtINR($curCost) }}</div></div>
     <div class="kpi-card"><div class="kpi-label">Month Net P/L</div><div class="kpi-value {{ $curPL >= 0 ? 'green' : 'red' }}">{{ fmtINR($curPL) }}</div></div>
     <div class="kpi-card"><div class="kpi-label">Month Margin</div><div class="kpi-value {{ $curMgn >= 0 ? 'green' : 'red' }}">{{ fmtPct($curMgn) }}</div></div>
+    @endif
 </div>
 
 <!-- Monthly Table -->
@@ -72,12 +74,14 @@
                     <th style="text-align:left">DATE</th>
                     <th>GAM REV ($)</th>
                     <th>GAM REVENUE (₹)</th>
+                    @if (showMeta())
                     <th>META SPEND</th>
                     <th>GST</th>
                     <th>TOTAL COST</th>
                     <th>NET P/L</th>
                     <th>MARGIN</th>
                     <th>STATUS</th>
+                    @endif
                 </tr>
             </thead>
             <tbody>
@@ -86,12 +90,14 @@
                 <td style="text-align:left;font-weight:700;color:#a78bfa">{{ $pmLabel }} TOTAL</td>
                 <td class="c-green" style="font-size:11px">${{ number_format($pmGAMusd, 2) }}</td>
                 <td class="c-green">{{ fmtINR($pmGAM) }}</td>
+                @if (showMeta())
                 <td class="c-orange">{{ fmtINR($pmMeta) }}<div style="font-size:10px;color:var(--text-muted);font-weight:400">{{ fmtUsdFromInr($pmMeta, $usdRate) }}</div></td>
                 <td class="c-gold">{{ fmtINR($pmGST) }}</td>
                 <td>{{ fmtINR($pmCost) }}</td>
                 <td class="{{ $pmPL >= 0 ? 'c-green' : 'c-red' }}">{{ fmtINR($pmPL) }}</td>
                 <td class="{{ $pmMgn >= 0 ? 'c-green' : 'c-red' }}">{{ fmtPct($pmMgn) }}</td>
                 <td>{!! $pmPL >= 0 ? '<span class="badge-profit">✓ Profit</span>' : '<span class="badge-loss">✗ Loss</span>' !!}</td>
+                @endif
             </tr>
 
             @for ($day = 1; $day <= $daysInMonth; $day++)
@@ -118,6 +124,7 @@
                 </td>
                 <td class="{{ $hasD ? 'c-green' : 'c-muted' }}" style="font-size:11px">${{ number_format($gusd, 2) }}</td>
                 <td class="{{ $hasD ? 'c-green' : 'c-muted' }}">{{ fmtINR($gam) }}</td>
+                @if (showMeta())
                 <td class="{{ $hasD ? 'c-orange' : 'c-muted' }}">{{ fmtINR($meta) }}<div style="font-size:10px;color:var(--text-muted);font-weight:400">{{ fmtUsdFromInr($meta, $usdRate) }}</div></td>
                 <td class="{{ $hasD ? 'c-gold' : 'c-muted' }}">{{ fmtINR($gst) }}</td>
                 <td class="{{ $hasD ? '' : 'c-muted' }}">{{ fmtINR($cost) }}</td>
@@ -128,6 +135,7 @@
                     @elseif ($pl >= 0)<span class="badge-profit">✓ Profit</span>
                     @else<span class="badge-loss">✗ Loss</span>@endif
                 </td>
+                @endif
             </tr>
             @endfor
             </tbody>
@@ -136,12 +144,14 @@
                     <td style="text-align:left">{{ strtoupper($monthName) }} TOTAL</td>
                     <td class="c-green" style="font-size:11px">${{ number_format($curGAMusd, 2) }}</td>
                     <td class="c-green">{{ fmtINR($curGAM) }}</td>
+                    @if (showMeta())
                     <td class="c-orange">{{ fmtINR($curMeta) }}<div style="font-size:10px;color:var(--text-muted);font-weight:400">{{ fmtUsdFromInr($curMeta, $usdRate) }}</div></td>
                     <td class="c-gold">{{ fmtINR($curGST) }}</td>
                     <td>{{ fmtINR($curCost) }}</td>
                     <td class="{{ $curPL >= 0 ? 'c-green' : 'c-red' }}">{{ fmtINR($curPL) }}</td>
                     <td class="{{ $curMgn >= 0 ? 'c-green' : 'c-red' }}">{{ fmtPct($curMgn) }}</td>
                     <td>{!! $curPL >= 0 ? '<span class="badge-profit">✓ Profit</span>' : '<span class="badge-loss">✗ Loss</span>' !!}</td>
+                    @endif
                 </tr>
             </tfoot>
         </table>
@@ -160,20 +170,22 @@
                 <tr>
                     <th style="text-align:left">LINK</th>
                     @if (canSeeAllUsers())<th style="text-align:left">USER</th>@endif
-                    <th style="text-align:left">CAMPAIGNS</th>
+                    @if (showMeta())<th style="text-align:left">CAMPAIGNS</th>@endif
                     <th>GAM REV ($)</th>
                     <th>GAM REVENUE (₹)</th>
+                    @if (showMeta())
                     <th>META SPEND</th>
                     <th>GST</th>
                     <th>TOTAL COST</th>
                     <th>NET P/L</th>
                     <th>MARGIN</th>
                     <th>STATUS</th>
+                    @endif
                 </tr>
             </thead>
             <tbody>
             @if (empty($linkMonthly))
-            <tr><td colspan="{{ canSeeAllUsers() ? 11 : 10 }}" style="text-align:center;color:var(--text-muted);padding:30px">No active links found.</td></tr>
+            <tr><td colspan="{{ (canSeeAllUsers() ? 1 : 0) + (showMeta() ? 10 : 3) }}" style="text-align:center;color:var(--text-muted);padding:30px">No active links found.</td></tr>
             @endif
             @foreach ($linkMonthly as $lm)
                 @php
@@ -184,7 +196,7 @@
                     $lCost   = round($lMeta + $lGst, 2);
                     $lPL     = round($lGamInr - $lCost, 2);
                     $lMgn    = $lCost > 0 ? round($lPL / $lCost * 100, 1) : 0;
-                    $hasD    = ($lGamUsd > 0 || $lMeta > 0);
+                    $hasD    = ($lGamUsd > 0 || (showMeta() && $lMeta > 0));
                     $campTags = array_values(array_filter(array_map('trim', explode(',', $lm['meta_campaign']))));
                 @endphp
             <tr class="{{ $hasD ? '' : 'row-nodata' }}">
@@ -196,6 +208,7 @@
                     </span>
                 </td>
                 @endif
+                @if (showMeta())
                 <td style="text-align:left">
                     <div style="display:flex;flex-wrap:wrap;gap:3px;max-width:260px">
                     @foreach ($campTags as $ct)
@@ -203,8 +216,10 @@
                     @endforeach
                     </div>
                 </td>
+                @endif
                 <td class="{{ $hasD ? 'c-green' : 'c-muted' }}" style="font-size:11px">${{ number_format($lGamUsd, 2) }}</td>
                 <td class="{{ $hasD ? 'c-green' : 'c-muted' }}">{{ fmtINR($lGamInr) }}</td>
+                @if (showMeta())
                 <td class="{{ $hasD ? 'c-orange' : 'c-muted' }}">{{ fmtINR($lMeta) }}<div style="font-size:10px;color:var(--text-muted);font-weight:400">{{ fmtUsdFromInr($lMeta, $usdRate) }}</div></td>
                 <td class="{{ $hasD ? 'c-gold' : 'c-muted' }}">{{ fmtINR($lGst) }}</td>
                 <td class="{{ $hasD ? '' : 'c-muted' }}">{{ fmtINR($lCost) }}</td>
@@ -218,20 +233,23 @@
                     <span style="background:#2e1a1a;color:#f87171;border-radius:10px;font-size:9px;padding:1px 6px;margin-left:3px;vertical-align:middle">Inactive</span>
                     @endif
                 </td>
+                @endif
             </tr>
             @endforeach
             </tbody>
             <tfoot>
                 <tr>
-                    <td colspan="{{ canSeeAllUsers() ? 3 : 2 }}" style="text-align:left">{{ strtoupper($monthName) }} TOTAL</td>
+                    <td colspan="{{ 1 + (canSeeAllUsers() ? 1 : 0) + (showMeta() ? 1 : 0) }}" style="text-align:left">{{ strtoupper($monthName) }} TOTAL</td>
                     <td class="c-green" style="font-size:11px">${{ number_format($curGAMusd, 2) }}</td>
                     <td class="c-green">{{ fmtINR($curGAM) }}</td>
+                    @if (showMeta())
                     <td class="c-orange">{{ fmtINR($curMeta) }}<div style="font-size:10px;color:var(--text-muted);font-weight:400">{{ fmtUsdFromInr($curMeta, $usdRate) }}</div></td>
                     <td class="c-gold">{{ fmtINR($curGST) }}</td>
                     <td>{{ fmtINR($curCost) }}</td>
                     <td class="{{ $curPL >= 0 ? 'c-green' : 'c-red' }}">{{ fmtINR($curPL) }}</td>
                     <td class="{{ $curMgn >= 0 ? 'c-green' : 'c-red' }}">{{ fmtPct($curMgn) }}</td>
                     <td>{!! $curPL >= 0 ? '<span class="badge-profit">✓ Profit</span>' : '<span class="badge-loss">✗ Loss</span>' !!}</td>
+                    @endif
                 </tr>
             </tfoot>
         </table>

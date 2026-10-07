@@ -380,7 +380,7 @@ class MonthlyController extends Controller
             $cost = round($meta + round($meta * $gstRate / 100, 2), 2);
             $pl   = round($gam - $cost, 2);
             $mgn  = $cost > 0 ? round($pl / $cost * 100, 1) : 0;
-            return compact('meta', 'cost', 'pl', 'mgn');
+            return compact('meta', 'gam', 'cost', 'pl', 'mgn');
         };
 
         try {
@@ -505,7 +505,8 @@ class MonthlyController extends Controller
                 }
             }
 
-            usort($rows, fn ($a, $b) => $b['total']['meta'] <=> $a['total']['meta']);
+            $sortKey = showMeta() ? 'meta' : 'gam';
+            usort($rows, fn ($a, $b) => $b['total'][$sortKey] <=> $a['total'][$sortKey]);
         } catch (\Throwable $e) {
             $dbOk = false; $error = $e->getMessage(); $rows = [];
         }
@@ -515,7 +516,7 @@ class MonthlyController extends Controller
         foreach ($rows as $r) $actionCounts[$r['advice']['key']]++;
 
         // Column totals per date + grand total (margin recomputed from summed P/L and cost).
-        $blank = ['meta' => 0, 'cost' => 0, 'pl' => 0];
+        $blank = ['meta' => 0, 'gam' => 0, 'cost' => 0, 'pl' => 0];
         $totByDate = array_fill_keys($dates, $blank);
         $grand = $blank;
         foreach ($rows as $r) {
@@ -654,14 +655,19 @@ class MonthlyController extends Controller
             'Net P/L'         => fn ($m) => number_format($m['pl'], 2, '.', ''),
             'Margin (%)'      => fn ($m) => number_format($m['mgn'], 1, '.', ''),
         ];
+        $showMeta = showMeta();
+        if (!$showMeta) {
+            $metrics = array_intersect_key($metrics, array_flip(['GAM Rev ($)', 'GAM Revenue (Rs)']));
+        }
 
-        $header = ['META URL', 'GAM URL', 'ADX'];
+        $header = $showMeta ? ['META URL', 'GAM URL', 'ADX'] : ['GAM URL', 'ADX'];
         foreach ($metrics as $label => $_) { $header[] = "$label ($d1)"; $header[] = "$label ($d2)"; }
-        array_push($header, 'Status', 'User', 'Notes');
+        if ($showMeta) $header[] = 'Status';
+        array_push($header, 'User', 'Notes');
 
         $filename = 'date-wise-' . $date1 . '-vs-' . $date2 . ($lastGamOnly ? '-lastgam' : '') . '.csv';
 
-        return response()->streamDownload(function () use ($rows, $metrics, $header, $lastGamOnly) {
+        return response()->streamDownload(function () use ($rows, $metrics, $header, $lastGamOnly, $showMeta) {
             $out = fopen('php://output', 'w');
             fwrite($out, "\xEF\xBB\xBF"); // UTF-8 BOM so Excel reads it correctly
             fputcsv($out, $header);
@@ -671,10 +677,12 @@ class MonthlyController extends Controller
                     $hosts = array_values(array_filter(array_map('trim', explode(',', $r['gam_url']))));
                     $gam   = $hosts ? end($hosts) : '';
                 }
-                $line = [$r['meta_url'], $gam, $r['adx_name']];
+                $line = $showMeta ? [$r['meta_url'], $gam, $r['adx_name']] : [$gam, $r['adx_name']];
                 foreach ($metrics as $fn) { $line[] = $fn($r['d1']); $line[] = $fn($r['d2']); }
-                $combinedPL = $r['d1']['pl'] + $r['d2']['pl'];
-                $line[] = !$r['has'] ? 'No data' : ($combinedPL >= 0 ? 'Profit' : 'Loss');
+                if ($showMeta) {
+                    $combinedPL = $r['d1']['pl'] + $r['d2']['pl'];
+                    $line[] = !$r['has'] ? 'No data' : ($combinedPL >= 0 ? 'Profit' : 'Loss');
+                }
                 $line[] = $r['owner_name'];
                 $line[] = $r['notes'];
                 fputcsv($out, $line);

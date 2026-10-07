@@ -60,7 +60,12 @@
 <div class="data-card">
     <div class="data-card-header" style="flex-wrap:wrap">
         <i class="bi bi-table"></i> Site Performance &mdash; {{ $displayDate }}
-        <span style="margin-left:auto;font-weight:400;font-size:11px;color:var(--text-muted)">USD/{{ getDefaultCurrency()['code'] }}: {{ number_format($usdRate, 2) }}</span>
+        <div style="margin-left:auto;display:flex;align-items:center;gap:8px">
+            @if ($rows)
+            <a href="{{ request()->fullUrlWithQuery(['export' => 'csv']) }}" class="btn-sm-custom"><i class="bi bi-download"></i> Export CSV</a>
+            @endif
+            <span style="font-weight:400;font-size:11px;color:var(--text-muted)">USD/{{ getDefaultCurrency()['code'] }}: {{ number_format($usdRate, 2) }}</span>
+        </div>
     </div>
     <div class="table-wrap">
         <table class="ledger" id="siteTable">

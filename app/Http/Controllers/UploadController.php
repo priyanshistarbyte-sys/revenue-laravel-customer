@@ -22,6 +22,9 @@ class UploadController extends Controller
             }
             $type = $request->input('type', '');
             $file = $request->file('csv_file');
+            if ($type === 'meta' && !showMeta()) {
+                abort(403, 'Meta upload is turned off.');
+            }
 
             if (in_array($type, ['meta', 'gam', 'hourly']) && $file && $file->isValid()) {
                 $origName = $file->getClientOriginalName();
@@ -49,7 +52,9 @@ class UploadController extends Controller
 
         try {
             $pdo = getDB();
-            $recentMeta = $pdo->query("SELECT date, COUNT(*) as cnt, SUM(amount_spent) as total FROM meta_data GROUP BY date ORDER BY date DESC LIMIT 7")->fetchAll();
+            $recentMeta = showMeta()
+                ? $pdo->query("SELECT date, COUNT(*) as cnt, SUM(amount_spent) as total FROM meta_data GROUP BY date ORDER BY date DESC LIMIT 7")->fetchAll()
+                : [];
             $recentGAM  = $pdo->query("SELECT date, COUNT(*) as cnt, SUM(revenue_usd) as total FROM gam_data GROUP BY date ORDER BY date DESC LIMIT 7")->fetchAll();
             $recentHourly = $pdo->query("SELECT date, COUNT(DISTINCT site) as sites, COUNT(*) as cnt FROM gam_hourly GROUP BY date ORDER BY date DESC LIMIT 7")->fetchAll();
         } catch (\Throwable $e) {
@@ -75,6 +80,9 @@ class UploadController extends Controller
         }
         $type = $request->input('type', '');
         $date = $request->input('date', '');
+        if ($type === 'meta' && !showMeta()) {
+            abort(403, 'Meta data deletion is turned off.');
+        }
 
         if (!in_array($type, ['meta', 'gam', 'hourly']) || !preg_match('/^\d{4}-\d{2}-\d{2}$/', $date)) {
             return redirect('/upload')->with('flash', ['type' => 'error', 'msg' => 'Invalid request.']);

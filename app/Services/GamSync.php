@@ -89,7 +89,7 @@ class GamSync
         }
 
         // Throttle
-        $minH = (float) ($this->cfg['min_interval_hours'] ?? 3);
+        $minH = (float) ($this->cfg['min_interval_hours'] ?? 0.75);
         $last = getSetting('gam_last_sync', '');
         if (!$force && $last !== '') {
             $hrs = (time() - strtotime($last)) / 3600;

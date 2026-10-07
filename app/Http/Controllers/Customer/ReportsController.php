@@ -109,6 +109,30 @@ class ReportsController extends Controller
 
         $totCtr    = $totImpr > 0 ? round($totClicks / $totImpr * 100, 2) : null;
 
+        if ($request->query('export') === 'csv') {
+            $fmt  = fn ($v) => number_format((float) $v, 2, '.', '');
+            $pct  = fn ($p) => rtrim(rtrim(number_format($p, 2), '0'), '.') . '%';
+            $data = [];
+            foreach ($rows as $r) {
+                $share  = $r['gamINR'] * $sharePct / 100;
+                $data[] = [
+                    implode(', ', $r['gamSites']),
+                    $fmt($r['gamUSD'] ?? 0),
+                    $fmt($r['gamINR']),
+                    $r['ctr'] !== null ? $fmt($r['ctr']) : '',
+                    $fmt($share),
+                    $fmt($r['gamINR'] - $share),
+                ];
+            }
+            $totShare = $totGAM * $sharePct / 100;
+            $data[] = ['TOTALS', $fmt($totGAMusd), $fmt($totGAM), $totCtr !== null ? $fmt($totCtr) : '', $fmt($totShare), $fmt($totGAM - $totShare)];
+
+            return $this->csv('site-wise-' . $date . '.csv', [
+                'GAM URL', 'GAM Rev ($)', 'GAM Rev (Rs)', 'CTR (%)',
+                'Share ' . $pct($sharePct) . ' (Rs)', 'Remaining ' . $pct($restPct) . ' (Rs)',
+            ], $data);
+        }
+
         $dateObj     = new DateTime($date);
         $displayDate = $dateObj->format('d M Y') . ' (' . $dateObj->format('l') . ')';
 
@@ -202,11 +226,40 @@ class ReportsController extends Controller
         $tot['ctr']  = $tot['impr'] > 0 ? $tot['clicks'] / $tot['impr'] * 100 : null;
         $tot['ecpm'] = $tot['impr'] > 0 ? $tot['rev'] / $tot['impr'] * 1000 : null;
 
+        if ($request->query('export') === 'csv') {
+            $fmt  = fn ($v) => number_format((float) $v, 2, '.', '');
+            $data = [];
+            foreach ($rows as $r) {
+                $data[] = [$r['site'], $r['dim'], $fmt($r['ctr']), $r['req'], $fmt($r['rev']), $fmt($r['ecpm']), $r['impr']];
+            }
+            $data[] = [
+                'TOTALS', '', $tot['ctr'] !== null ? $fmt($tot['ctr']) : '', $tot['req'], $fmt($tot['rev']),
+                $tot['ecpm'] !== null ? $fmt($tot['ecpm']) : '', $tot['impr'],
+            ];
+
+            return $this->csv($activePage . '-' . $date . ($site !== '' ? '-' . $site : '') . '.csv', [
+                'Site', ucfirst($dimCol), 'Ad Exchange CTR (%)', 'Ad Exchange total requests',
+                'Ad Exchange revenue ($)', 'Ad Exchange average eCPM ($)', 'Ad Exchange impressions',
+            ], $data);
+        }
+
         $dateObj     = new DateTime($date);
         $displayDate = $dateObj->format('d M Y') . ' (' . $dateObj->format('l') . ')';
 
         return view($view, compact(
             'pageTitle', 'activePage', 'date', 'datesRaw', 'displayDate', 'sites', 'site', 'rows', 'tot'
         ));
+    }
+
+    /** Stream rows as a CSV download (UTF-8 BOM so Excel reads it correctly). */
+    private function csv(string $filename, array $header, array $rows)
+    {
+        return response()->streamDownload(function () use ($header, $rows) {
+            $out = fopen('php://output', 'w');
+            fwrite($out, "\xEF\xBB\xBF");
+            fputcsv($out, $header);
+            foreach ($rows as $row) fputcsv($out, $row);
+            fclose($out);
+        }, $filename, ['Content-Type' => 'text/csv; charset=UTF-8']);
     }
 }

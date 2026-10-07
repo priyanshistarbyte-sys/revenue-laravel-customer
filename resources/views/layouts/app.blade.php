@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en" data-root-url="{{ rtrim(url('/'), '/') }}">
+<html lang="en" data-root-url="{{ rtrim(url('/'), '/') }}" data-show-meta="{{ showMeta() ? '1' : '0' }}">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -22,10 +22,10 @@
             <i class="bi bi-graph-up-arrow me-2"></i>Amaira
         </a>
         @php
-            $managePages  = ['domains', 'links', 'site-checker', 'adx', 'accounts', 'upload'];
+            $managePages  = ['domains', 'links', 'site-checker', 'adx', 'upload'];
             $financePages = ['expenses', 'invoices', 'currencies'];
             $adminPages   = ['users', 'customers', 'roles', 'zip-masters', 'server-masters'];
-            $canManage    = userCan('domains') || userCan('links') || userCan('adx') || userCan('accounts') || userCan('upload');
+            $canManage    = userCan('domains') || userCan('links') || userCan('adx') || userCan('upload');
             $canFinance   = userCan('expenses') || userCan('invoices') || userCan('currencies');
             $canAdmin     = userCan('users') || userCan('customers') || userCan('roles') || userCan('zip_masters') || userCan('server_masters');
             
@@ -81,7 +81,6 @@
                     @if (userCan('links'))<li><a class="dropdown-item {{ $active==='links'    ? 'active':'' }}" href="{{ url('/links') }}"><i class="bi bi-link-45deg"></i> Links</a></li>@endif
                     @if (userCan('links'))<li><a class="dropdown-item {{ $active==='site-checker' ? 'active':'' }}" href="{{ url('/site-checker') }}"><i class="bi bi-patch-check"></i> Site Checker</a></li>@endif
                     @if (userCan('adx'))<li><a class="dropdown-item {{ $active==='adx'      ? 'active':'' }}" href="{{ url('/adx') }}"><i class="bi bi-diagram-3"></i> ADX</a></li>@endif
-                    @if (userCan('accounts'))<li><a class="dropdown-item {{ $active==='accounts' ? 'active':'' }}" href="{{ url('/accounts') }}"><i class="bi bi-person-badge"></i> Accounts</a></li>@endif
                     @if (userCan('upload'))<li><a class="dropdown-item {{ $active==='upload'   ? 'active':'' }}" href="{{ url('/upload') }}"><i class="bi bi-cloud-upload"></i> Upload</a></li>@endif
                 </ul>
             </div>

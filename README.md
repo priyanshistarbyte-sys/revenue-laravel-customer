@@ -55,7 +55,6 @@ browser.
 | `links.php` (main domains) | `DomainsController` + `domains.blade.php` (`/domains`) |
 | `links.php` (subdomains)   | `LinksController` + `links.blade.php` (`/links`) |
 | `adx.php`                | `AdxController` |
-| `accounts.php`           | `AccountsController` |
 | `expenses.php`           | `ExpensesController` |
 | `invoices.php` (+download/preview) | `InvoicesController` |
 | `upload.php` / `delete_data.php` | `UploadController` (CSV import) |
@@ -74,8 +73,9 @@ used none and everything is behind PIN auth) — see `bootstrap/app.php`.
 ## API syncs
 
 Both syncs are disabled by default. Configure credentials on the ADX page
-(GAM: network code, saved-report id, service-account JSON key) and the Meta
-Accounts page (Meta System User token + ad account ids + owner), then enable in
+(GAM: network code, saved-report id, service-account JSON key) and the
+`meta_accounts` table (Meta System User token + ad account ids + owner — the
+Accounts page has been removed, so edit the table directly), then enable in
 `.env`:
 
 ```env
@@ -83,12 +83,26 @@ GAM_ENABLED=true
 META_ENABLED=true
 ```
 
-Run them from the CLI or the buttons on the ADX / Accounts / Upload pages:
+Run them from the CLI or the buttons on the ADX / Upload pages:
 
 ```bash
 php artisan gam:sync  [--account=ID] [--force] [--list-reports]
 php artisan meta:sync [--account=ID] [--force] [--list-accounts]
 ```
+
+### Scheduled GAM sync (cron)
+
+`gam:sync --force` runs on Laravel's scheduler (`routes/console.php`) every
+hour by default — change it with `GAM_SYNC_CRON` (a cron expression; empty
+disables it). Output is appended to `storage/logs/gam-sync.log`. The server's
+crontab must call the scheduler once a minute:
+
+```cron
+* * * * * cd /path/to/revenue-laravel-customer && php artisan schedule:run >> /dev/null 2>&1
+```
+
+Locally, `php artisan schedule:work` does the same in the foreground;
+`php artisan schedule:list` shows when the next run is due.
 
 Set `GAM_MOCK=true` / `META_MOCK=true` to exercise the import pipeline with
 sample rows before real credentials are ready. Shared settings (lookback days,

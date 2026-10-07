@@ -474,26 +474,6 @@ function customerLogout(): void
 function currentCustomerId(): int      { return (int) session('customer_id', 0); }
 function currentCustomerName(): string { return (string) session('customer_name', ''); }
 
-// ── accounts.php view helpers ───────────────────────────────────────
-/** Render a multi-tag cell (BM IDs / Ad Account IDs). */
-function accTagCell(string $raw, string $copyPrefix = ''): string
-{
-    $tags = array_filter(array_map('trim', explode(',', $raw)));
-    if (empty($tags)) return '<span style="color:var(--text-muted)">—</span>';
-    // Wrap the id chips so many ids flow onto multiple lines instead of
-    // overflowing the cell horizontally.
-    $out = "<div style='display:flex;flex-wrap:wrap;gap:3px 5px;max-width:260px;white-space:normal'>";
-    foreach ($tags as $t) {
-        $display = htmlspecialchars($t);
-        $copy    = htmlspecialchars($copyPrefix . $t);
-        $out    .= "<span style='display:inline-flex;align-items:center;gap:2px'>"
-                 . "<span class='acc-multi-tag'>{$display}</span>"
-                 . "<button class='btn-copy' data-copy='{$copy}' title='Copy'><i class='bi bi-clipboard'></i></button>"
-                 . "</span>";
-    }
-    return $out . '</div>';
-}
-
 // ── invoices.php view helpers ───────────────────────────────────────
 function fmtBytes(int $bytes): string
 {
@@ -509,21 +489,6 @@ function iconForMime(string $mime): string
     if (str_contains($mime, 'word'))     return 'bi-file-earmark-word-fill';
     if (str_contains($mime, 'excel') || str_contains($mime, 'spreadsheet')) return 'bi-file-earmark-excel-fill';
     return 'bi-file-earmark-fill';
-}
-
-/** Render a hidden/reveal (secret) cell. */
-function accSecretCell(string $val, bool $isEmail = false): string
-{
-    if ($val === '') return '<span style="color:var(--text-muted)">—</span>';
-    $dots    = str_repeat('•', min(10, strlen($val)));
-    $display = htmlspecialchars($val);
-    $copy    = htmlspecialchars($val);
-    $link    = $isEmail ? "<a href='mailto:{$display}' style='color:#7dd3fc'>{$display}</a>" : $display;
-    return "
-        <span class='acc-hidden'>{$dots}</span>
-        <span class='acc-reveal' style='display:none;font-family:monospace;font-size:11px'>{$link}</span>
-        <button class='btn-eye' onclick='toggleReveal(this)' title='Reveal'><i class='bi bi-eye'></i></button>
-        <button class='btn-copy' data-copy='{$copy}' title='Copy'><i class='bi bi-clipboard'></i></button>";
 }
 
 // ── Access control: pages, permissions & data scope ─────────────────
@@ -546,7 +511,6 @@ function permissionPages(): array
         'links'      => ['label' => 'Links',     'icon' => 'bi-link-45deg',        'actions' => ['view', 'add', 'edit', 'delete']],
         'adx'        => ['label' => 'ADX',       'icon' => 'bi-diagram-3',         'actions' => ['view', 'add', 'edit', 'delete']],
         'upload'     => ['label' => 'Upload',    'icon' => 'bi-cloud-upload',      'actions' => ['view', 'add', 'delete']],
-        'accounts'   => ['label' => 'Accounts',  'icon' => 'bi-person-badge',      'actions' => ['view', 'add', 'edit', 'delete']],
         'expenses'   => ['label' => 'Expenses',  'icon' => 'bi-wallet2',           'actions' => ['view', 'add', 'edit', 'delete']],
         'invoices'   => ['label' => 'Invoices',  'icon' => 'bi-file-earmark-text', 'actions' => ['view', 'add', 'edit', 'delete']],
         'currencies' => ['label' => 'Currency',  'icon' => 'bi-currency-exchange', 'actions' => ['view', 'add', 'edit', 'delete']],
@@ -582,9 +546,21 @@ function loadUserPermissions(): array
     return $cache;
 }
 
+/**
+ * Whether Meta campaigns and spend (and everything derived from spend: GST,
+ * total cost, P/L, margin, profit/loss) are shown in the staff UI.
+ * Off by default — set META_SHOW_IN_UI=true to bring them back.
+ */
+function showMeta(): bool
+{
+    return (bool) config('adledger.meta.show_in_ui', false);
+}
+
 /** True if the current user may perform $action on $page. Admins may do anything. */
 function userCan(string $page, string $action = 'view'): bool
 {
+    // Meta Campaigns is switched off entirely while Meta is hidden (see showMeta()).
+    if ($page === 'meta_campaigns' && !showMeta()) return false;
     if (isAdmin()) return true;
     $perms = loadUserPermissions();
     return !empty($perms[$page][$action]);
