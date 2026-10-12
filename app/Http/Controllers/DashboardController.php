@@ -48,10 +48,11 @@ class DashboardController extends Controller
             if (canSeeAllUsers()) {
                 $customerOptions = $pdo->query("SELECT id, name, active FROM customers ORDER BY name")->fetchAll();
             }
-            $links = $pdo->query("SELECT l.*, u.name AS owner_name
+            $links = $pdo->query("SELECT l.*, u.name AS owner_name, cu.name AS customer_name
                                   FROM links l
                                   LEFT JOIN domains d ON d.id=l.domain_id
                                   LEFT JOIN users u ON u.id=l.user_id
+                                  LEFT JOIN customers cu ON cu.id=l.customer_id
                                   WHERE $linkScope $adxWhere $customerWhere ORDER BY l.link_name")->fetchAll();
 
             // Map of domain name → ADX name, used to resolve a link's ADX from its
@@ -199,6 +200,39 @@ class DashboardController extends Controller
         $totMargin = $totCost > 0 ? round($totNetPL / $totCost * 100, 1) : 0;
         $totCtr    = $totImpr > 0 ? round($totClicks / $totImpr * 100, 2) : null;
 
+        // ── Customer-wise blocks: rows grouped by assigned customer (unassigned
+        // first, then A→Z), each with its own subtotals. Rows keep their index for sub-row ids.
+        $groups = [];
+        foreach ($rows as $ri => $r) {
+            $cid = (int) ($r['link']['customer_id'] ?? 0);
+            $key = $cid > 0 ? 'c' . $cid : 'none';
+            $groups[$key] ??= [
+                'name' => $cid > 0 ? ($r['link']['customer_name'] ?? ('Customer #' . $cid)) : 'No customer',
+                'rows' => [], 'gamUSD' => 0.0, 'gamINR' => 0.0, 'meta' => 0.0, 'gst' => 0.0, 'cost' => 0.0,
+                'netPL' => 0.0, 'impr' => 0, 'clicks' => 0, 'profit' => 0, 'loss' => 0,
+            ];
+            $g = &$groups[$key];
+            $g['rows'][$ri] = $r;
+            if ($r['hasData']) {
+                $g['gamUSD'] += $r['gamUSD'] ?? 0;
+                $g['gamINR'] += $r['gamINR'];
+                $g['meta']   += $r['spend'];
+                $g['gst']    += $r['gst'];
+                $g['cost']   += $r['cost'];
+                $g['netPL']  += $r['netPL'];
+                $g['impr']   += $r['gamImpr'];
+                $g['clicks'] += $r['gamClicks'];
+                if ($r['netPL'] >= 0) $g['profit']++; else $g['loss']++;
+            }
+            unset($g);
+        }
+        foreach ($groups as &$g) {
+            $g['margin'] = $g['cost'] > 0 ? round($g['netPL'] / $g['cost'] * 100, 1) : 0;
+            $g['ctr']    = $g['impr'] > 0 ? round($g['clicks'] / $g['impr'] * 100, 2) : null;
+        }
+        unset($g);
+        uksort($groups, fn ($a, $b) => $a === 'none' ? -1 : ($b === 'none' ? 1 : strnatcasecmp($groups[$a]['name'], $groups[$b]['name'])));
+
         // ── Distinct link notes for the filter ──
         $noteOptions  = [];
         $hasEmptyNote = false;
@@ -218,7 +252,7 @@ class DashboardController extends Controller
         return view('dashboard', compact(
             'pageTitle', 'activePage', 'date', 'usdRate', 'gstRate', 'customerOptions', 'customerFilter',
             'adxOptions', 'adxFilter',
-            'rows', 'totGAMusd', 'totGAM', 'totMeta', 'totGST', 'totCost', 'totNetPL',
+            'rows', 'groups', 'totGAMusd', 'totGAM', 'totMeta', 'totGST', 'totCost', 'totNetPL',
             'totMargin', 'totCtr', 'totImpr', 'totClicks', 'cntProfit', 'cntLoss', 'noteOptions', 'hasEmptyNote',
             'datesRaw', 'displayDate', 'monthYear', 'dbOk', 'error'
         ) + ['flash' => session('flash')]);

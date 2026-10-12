@@ -143,11 +143,18 @@
     @endif
 </div>
 
-<!-- Main Table -->
-<div class="data-card">
+<!-- Main Table: one collapsible block per customer -->
+<div class="data-card" style="margin-bottom:14px">
     <div class="data-card-header" style="flex-wrap:wrap">
         <i class="bi bi-table"></i> Link Performance &mdash; {{ $displayDate }}
-        <button type="button" id="dashExportBtn" class="btn-sm-custom" style="margin-left:auto" data-date="{{ $date }}">
+        <span style="font-weight:400;font-size:11px;color:var(--text-muted);margin-left:6px">{{ count($groups) }} customer(s) · {{ count($rows) }} link(s)</span>
+        <button type="button" class="btn-sm-custom" style="margin-left:auto" data-cust-toggle-all="open" title="Expand every customer block">
+            <i class="bi bi-arrows-expand"></i> Expand all
+        </button>
+        <button type="button" class="btn-sm-custom" style="margin-left:8px" data-cust-toggle-all="close" title="Collapse every customer block">
+            <i class="bi bi-arrows-collapse"></i> Collapse all
+        </button>
+        <button type="button" id="dashExportBtn" class="btn-sm-custom" style="margin-left:8px" data-date="{{ $date }}">
             <i class="bi bi-download"></i> Export CSV
         </button>
         <button type="button" id="dashDomainsBtn" class="btn-sm-custom" style="margin-left:8px" data-date="{{ $date }}"
@@ -155,45 +162,69 @@
             <i class="bi bi-globe2"></i> CSV (last GAM URL)
         </button>
         @if (showMeta())
-        <button type="button" class="btn-sm-custom" style="margin-left:8px" data-copy-meta-urls="dashTable"
+        <button type="button" class="btn-sm-custom" style="margin-left:8px" data-copy-meta-urls="dashGroups"
                 title="Copy the Meta URL of every row shown (respects the Notes filter), one per line">
             <i class="bi bi-clipboard"></i> Copy Meta URLs
         </button>
         @endif
         <span style="margin-left:12px;font-weight:400;font-size:11px;color:var(--text-muted)">USD/{{ getDefaultCurrency()['code'] }}: {{ number_format($usdRate, 2) }}</span>
     </div>
+    @if (!$groups)
+    <div style="text-align:center;color:var(--text-muted);padding:30px">No links for this date.</div>
+    @endif
+</div>
+
+<div id="dashGroups">
+@foreach ($groups as $gKey => $g)
+<div class="cust-group" data-group="{{ $gKey }}">
+    <button type="button" class="cust-group-head" aria-expanded="false" aria-controls="grp-{{ $gKey }}">
+        <i class="bi bi-plus-square cust-group-icon"></i>
+        <i class="bi bi-person-vcard" style="color:#c4b5fd"></i>
+        <span class="cust-group-name">{{ $g['name'] }}</span>
+        <span class="cust-group-meta"><span class="js-group-count">{{ count($g['rows']) }}</span> link(s)</span>
+        <span class="cust-group-stats">
+            <span class="cust-stat"><small>GAM Rev ($)</small><b class="c-green">${{ number_format($g['gamUSD'], 2) }}</b></span>
+            <span class="cust-stat"><small>GAM Revenue (₹)</small><b class="c-green">{{ fmtINR($g['gamINR']) }}</b></span>
+            @if (showMeta())
+            <span class="cust-stat"><small>Meta Spend</small><b class="c-orange">{{ fmtINR($g['meta']) }}</b></span>
+            <span class="cust-stat"><small>Net P/L</small><b class="{{ $g['netPL'] >= 0 ? 'c-green' : 'c-red' }}">{{ fmtINR($g['netPL']) }}</b></span>
+            @endif
+            {{-- <span class="cust-stat"><small>CTR</small><b>{{ $g['ctr'] !== null ? number_format($g['ctr'], 2) . '%' : '—' }}</b></span> --}}
+        </span>
+    </button>
+    <div class="cust-group-body" id="grp-{{ $gKey }}" hidden>
     <div class="table-wrap">
-        <table class="ledger" id="dashTable">
-            <thead>
-                <tr>
-                    <th data-sort="str" data-col="0">Entry Date <span class="sort-btn">⇅</span></th>
-                    @if (showMeta())
-                    <th data-sort="str" data-col="1">META URL <span style="font-weight:400">(spend)</span> <span class="sort-btn">⇅</span></th>
-                    @endif
-                    <th data-sort="str" data-col="2">GAM URL <span style="font-weight:400">(revenue)</span> <span class="sort-btn">⇅</span></th>
-                    <th data-sort="str" data-col="3">ADX <span class="sort-btn">⇅</span></th>
-                    <th data-sort="num" data-col="4">GAM Rev ($) <span class="sort-btn">⇅</span></th>
-                    <th data-sort="num" data-col="5">GAM Revenue (₹) <span class="sort-btn">⇅</span></th>
-                    @if (showMeta())
-                    <th data-sort="num" data-col="6">Meta Spend <span class="sort-btn">⇅</span></th>
-                    <th data-sort="num" data-col="7">GST <span class="sort-btn">⇅</span></th>
-                    <th data-sort="num" data-col="8">Total Cost <span class="sort-btn">⇅</span></th>
-                    <th data-sort="num" data-col="9">Net P/L <span class="sort-btn">⇅</span></th>
-                    <th data-sort="num" data-col="10">Margin <span class="sort-btn">⇅</span></th>
-                    @endif
-                    <th data-sort="num" data-col="11">CTR <span class="sort-btn">⇅</span></th>
-                    @if (showMeta())
-                    <th data-sort="str" data-col="12">Status <span class="sort-btn">⇅</span></th>
-                    @endif
-                    @if (canSeeAllUsers())
-                    <th data-sort="str" data-col="13">User <span class="sort-btn">⇅</span></th>
-                    @endif
-                    <th data-sort="str" data-col="{{ canSeeAllUsers() ? 14 : 13 }}">Notes <span class="sort-btn">⇅</span></th>
-                    <th style="text-align:center;width:80px">Actions</th>
-                </tr>
-            </thead>
+        <table class="ledger dash-table" data-customer="{{ $g['name'] }}">
+                <thead>
+                    <tr>
+                        <th data-sort="str" data-col="0">Entry Date <span class="sort-btn">⇅</span></th>
+                        @if (showMeta())
+                        <th data-sort="str" data-col="1">META URL <span style="font-weight:400">(spend)</span> <span class="sort-btn">⇅</span></th>
+                        @endif
+                        <th data-sort="str" data-col="2">GAM URL <span style="font-weight:400">(revenue)</span> <span class="sort-btn">⇅</span></th>
+                        <th data-sort="str" data-col="3">ADX <span class="sort-btn">⇅</span></th>
+                        <th data-sort="num" data-col="4">GAM Rev ($) <span class="sort-btn">⇅</span></th>
+                        <th data-sort="num" data-col="5">GAM Revenue (₹) <span class="sort-btn">⇅</span></th>
+                        @if (showMeta())
+                        <th data-sort="num" data-col="6">Meta Spend <span class="sort-btn">⇅</span></th>
+                        <th data-sort="num" data-col="7">GST <span class="sort-btn">⇅</span></th>
+                        <th data-sort="num" data-col="8">Total Cost <span class="sort-btn">⇅</span></th>
+                        <th data-sort="num" data-col="9">Net P/L <span class="sort-btn">⇅</span></th>
+                        <th data-sort="num" data-col="10">Margin <span class="sort-btn">⇅</span></th>
+                        @endif
+                        <th data-sort="num" data-col="11">CTR <span class="sort-btn">⇅</span></th>
+                        @if (showMeta())
+                        <th data-sort="str" data-col="12">Status <span class="sort-btn">⇅</span></th>
+                        @endif
+                        @if (canSeeAllUsers())
+                        <th data-sort="str" data-col="13">User <span class="sort-btn">⇅</span></th>
+                        @endif
+                        <th data-sort="str" data-col="{{ canSeeAllUsers() ? 14 : 13 }}">Notes <span class="sort-btn">⇅</span></th>
+                        <th style="text-align:center;width:80px">Actions</th>
+                    </tr>
+                </thead>
             <tbody>
-            @foreach ($rows as $ri => $r)
+            @foreach ($g['rows'] as $ri => $r)
                 @php
                     $cls       = !$r['hasData'] ? 'row-nodata' : (!showMeta() ? '' : ($r['netPL'] >= 0 ? 'row-profit' : 'row-loss'));
                     $campaigns = array_values(array_filter(array_map('trim', explode(',', $r['link']['meta_campaign']))));
@@ -351,6 +382,37 @@
             @endif
             @endforeach
             </tbody>
+                <tfoot>
+                    <tr>
+                        <td colspan="{{ showMeta() ? 3 : 2 }}" style="text-align:left">TOTAL</td>
+                        <td></td>
+                        <td class="c-green" style="font-size:11px">${{ number_format($g['gamUSD'], 2) }}</td>
+                        <td class="c-green">{{ fmtINR($g['gamINR']) }}</td>
+                        @if (showMeta())
+                        <td class="c-orange">{{ fmtINR($g['meta']) }}<div class="cell-meta-usd" style="font-size:10px;color:var(--text-muted);font-weight:400">{{ fmtUsdFromInr($g['meta'], $usdRate) }}</div></td>
+                        <td class="c-gold">{{ fmtINR($g['gst']) }}</td>
+                        <td>{{ fmtINR($g['cost']) }}</td>
+                        <td class="{{ $g['netPL'] >= 0 ? 'c-green' : 'c-red' }}">{{ fmtINR($g['netPL']) }}</td>
+                        <td class="{{ $g['margin'] >= 0 ? 'c-green' : 'c-red' }}">{{ fmtPct($g['margin']) }}</td>
+                        @endif
+                        <td>{{ $g['ctr'] !== null ? number_format($g['ctr'], 2) . '%' : '—' }}</td>
+                        @if (showMeta())
+                        <td><span class="badge-profit">{{ $g['profit'] }} Profit</span> <span class="badge-loss">{{ $g['loss'] }} Loss</span></td>
+                        @endif
+                        @if (canSeeAllUsers())<td></td>@endif
+                        <td></td>
+                        <td></td>
+                    </tr>
+                </tfoot>
+        </table>
+    </div>
+    </div>
+</div>
+@endforeach
+</div>
+
+{{-- Grand totals row, read by the CSV export (KPI cards show the same figures). --}}
+<table id="dashGrandTotals" hidden>
             <tfoot>
                 <tr>
                     <td colspan="{{ showMeta() ? 3 : 2 }}" style="text-align:left">TOTALS</td>
@@ -373,9 +435,7 @@
                     <td></td>
                 </tr>
             </tfoot>
-        </table>
-    </div>
-</div>
+</table>
 
 <!-- ── Row Edit Modal ── -->
 <div class="modal fade" id="rowEditModal" tabindex="-1">

@@ -9,13 +9,15 @@
     <link rel="icon" type="image/svg+xml" href="{{ asset('assets/favicon.svg') }}">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
-    <link rel="stylesheet" href="{{ asset('assets/css/style.css') }}">
+    {{-- Page CSS (e.g. daterangepicker) loads before style.css so the theme overrides it. --}}
+    @stack('styles')
+    <link rel="stylesheet" href="{{ asset('assets/css/style.css') }}?v={{ filemtime(public_path('assets/css/style.css')) }}">
 </head>
 <body>
 {{-- Same navbar as the admin layout (layouts/app.blade.php), with the customer menu. --}}
 @php
     $active      = $activePage ?? '';
-    $reportPages = ['site-wise', 'hourly-wise', 'country-wise'];
+    $reportPages = ['site-wise', 'date-range', 'hourly-wise', 'country-wise'];
 @endphp
 <nav class="navbar navbar-dark navbar-main">
     <div class="container-fluid">
@@ -41,6 +43,7 @@
                 </a>
                 <ul class="dropdown-menu nav-dropdown-menu">
                     <li><a class="dropdown-item {{ $active==='site-wise' ? 'active':'' }}" href="{{ url('/reports/site-wise') }}"><i class="bi bi-globe2"></i> Site Wise</a></li>
+                    <li><a class="dropdown-item {{ $active==='date-range' ? 'active':'' }}" href="{{ url('/reports/date-range') }}"><i class="bi bi-calendar-week"></i> Date Range</a></li>
                     <li><a class="dropdown-item {{ $active==='hourly-wise' ? 'active':'' }}" href="{{ url('/reports/hourly-wise') }}"><i class="bi bi-clock-history"></i> Hourly Wise</a></li>
                     <li><a class="dropdown-item {{ $active==='country-wise' ? 'active':'' }}" href="{{ url('/reports/country-wise') }}"><i class="bi bi-flag"></i> Country Wise</a></li>
                 </ul>

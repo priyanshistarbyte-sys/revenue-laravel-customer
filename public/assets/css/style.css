@@ -183,6 +183,44 @@ body { background: var(--header-bg); color: var(--text); font-family: 'Segoe UI'
 }
 .table-wrap { overflow-x: auto; }
 
+/* ── Highlighted exchange-rate badge (customer reports header) ── */
+.rate-badge {
+    display: inline-flex; align-items: center; gap: 8px;
+    background: rgba(255, 193, 7, .12); border: 1px solid rgba(255, 193, 7, .55);
+    color: #ffe08a; border-radius: 999px; padding: 6px 14px;
+    font-size: 12px; font-weight: 600; letter-spacing: .3px; white-space: nowrap;
+}
+.rate-badge i { color: var(--gold); font-size: 14px; }
+.rate-badge b { color: var(--gold); font-size: 15px; font-weight: 800; }
+
+/* ── Collapsible customer blocks (dashboard Link Performance) ── */
+.cust-group {
+    background: var(--card-bg); border: 1px solid var(--border); border-radius: 10px;
+    overflow: hidden; margin-bottom: 14px;
+}
+.cust-group-head {
+    width: 100%; display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+    background: var(--navy-mid); border: 0; padding: 13px 18px; text-align: left;
+    color: #fff; font-size: 13px; cursor: pointer;
+}
+.cust-group-head:hover { background: #2c2c6e; }
+.cust-group-head:focus-visible { outline: 2px solid var(--purple); outline-offset: -2px; }
+.cust-group.open .cust-group-head { border-bottom: 1px solid var(--border); }
+.cust-group-icon { color: #a78bfa; font-size: 15px; }
+.cust-group-name { font-weight: 700; font-size: 14px; }
+.cust-group-meta { color: var(--text-muted); font-size: 12px; font-weight: 600; }
+.cust-group-stats { margin-left: auto; display: flex; flex-wrap: wrap; gap: 8px; }
+.cust-stat {
+    display: flex; flex-direction: column; align-items: flex-end; min-width: 110px;
+    background: var(--card-bg); border: 1px solid var(--border); border-radius: 8px; padding: 5px 12px;
+}
+.cust-stat small { color: var(--text-muted); font-size: 10px; text-transform: uppercase; letter-spacing: .5px; }
+.cust-stat b { font-size: 14px; color: #fff; }
+.cust-stat b.c-green { color: var(--green); }
+.cust-stat b.c-orange { color: var(--orange); }
+.cust-stat b.c-red { color: var(--red); }
+@media (max-width: 767px) { .cust-group-stats { margin-left: 0; width: 100%; } .cust-stat { flex: 1; align-items: flex-start; } }
+
 /* ── Searchable select (combobox) ── */
 .ss-wrap { position: relative; }
 .ss-list {
@@ -322,10 +360,14 @@ table.ledger tfoot td {
 }
 table.ledger tfoot td:first-child { text-align: left; }
 /* Customer reports: TOTALS line up with the rows above (cols 1–3 left, rest centred). */
-#siteTable tfoot td, #hourTable tfoot td, #countryTable tfoot td { text-align: center; }
+#siteTable tfoot td, #rangeTable tfoot td, #hourTable tfoot td, #countryTable tfoot td { text-align: center; }
 #siteTable tfoot td:nth-child(-n+3),
+#rangeTable tfoot td:nth-child(-n+3),
 #hourTable tfoot td:nth-child(-n+3),
 #countryTable tfoot td:nth-child(-n+3) { text-align: left; }
+/* Date Range has an extra Date column, so cols 1–4 are left-aligned. */
+#rangeTable thead th:nth-child(4),
+#rangeTable tbody td:nth-child(4) { text-align: left; }
 
 /* ── Date filter box (.js-daterange / .js-datepicker) ── */
 .date-filter { position: relative; display: inline-flex; align-items: center; }

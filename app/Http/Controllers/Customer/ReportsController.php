@@ -68,6 +68,165 @@ class ReportsController extends Controller
         // Dates that have data — for the date dropdown.
         $datesRaw = $pdo->query("SELECT DISTINCT date FROM gam_data ORDER BY date DESC LIMIT 120")->fetchAll(PDO::FETCH_COLUMN);
 
+        ['rows' => $rows, 'totGAMusd' => $totGAMusd, 'totGAM' => $totGAM, 'totImpr' => $totImpr, 'totClicks' => $totClicks]
+            = $this->siteRows($links, $gamRaw, $usdRate);
+        $totCtr = $totImpr > 0 ? round($totClicks / $totImpr * 100, 2) : null;
+
+        if ($request->query('export') === 'csv') {
+            $fmt  = fn ($v) => number_format((float) $v, 2, '.', '');
+            $pct  = fn ($p) => rtrim(rtrim(number_format($p, 2), '0'), '.') . '%';
+            $data = [];
+            foreach ($rows as $r) {
+                $share  = $r['gamINR'] * $sharePct / 100;
+                $data[] = [
+                    implode(', ', $r['gamSites']),
+                    $fmt($r['gamUSD'] ?? 0),
+                    $fmt($r['gamINR']),
+                    $r['ctr'] !== null ? $fmt($r['ctr']) : '',
+                    $fmt($share),
+                    $fmt($r['gamINR'] - $share),
+                ];
+            }
+            $totShare = $totGAM * $sharePct / 100;
+            $data[] = ['TOTALS', $fmt($totGAMusd), $fmt($totGAM), $totCtr !== null ? $fmt($totCtr) : '', $fmt($totShare), $fmt($totGAM - $totShare)];
+
+            return $this->csv('site-wise-' . $date . '.csv', [
+                'GAM URL', 'GAM Rev ($)', 'GAM Rev (Rs)', 'CTR (%)',
+                'Share ' . $pct($sharePct) . ' (Rs)', 'Remaining ' . $pct($restPct) . ' (Rs)',
+            ], $data);
+        }
+
+        $dateObj     = new DateTime($date);
+        $displayDate = $dateObj->format('d M Y') . ' (' . $dateObj->format('l') . ')';
+
+        return view('customer.reports.site_wise', compact(
+            'pageTitle', 'activePage', 'date', 'datesRaw', 'displayDate', 'usdRate',
+            'rows', 'totGAMusd', 'totGAM', 'totCtr', 'totImpr', 'totClicks',
+            'sharePct', 'restPct'
+        ));
+    }
+
+    /**
+     * Date Range: the Site Wise report for every day between ?from and ?to,
+     * one row per day × site, with a Date column. Same maths as siteWise().
+     */
+    public function dateRange(Request $request)
+    {
+        $pageTitle  = 'Date Range';
+        $activePage = 'date-range';
+
+        $maxDays = 62;
+        $valid = fn ($d, $fallback) => preg_match('/^\d{4}-\d{2}-\d{2}$/', (string) $d) ? (string) $d : $fallback;
+        $from  = $valid($request->query('from'), date('Y-m-d', strtotime('-6 days')));
+        $to    = $valid($request->query('to'), date('Y-m-d'));
+        if ($from > $to) [$from, $to] = [$to, $from];
+
+        // Cap the range so the table stays usable.
+        $capped = false;
+        $maxTo  = (new DateTime($from))->modify('+' . ($maxDays - 1) . ' days')->format('Y-m-d');
+        if ($to > $maxTo) { $to = $maxTo; $capped = true; }
+
+        $dates = [];
+        for ($d = new DateTime($from); $d->format('Y-m-d') <= $to; $d->modify('+1 day')) {
+            $dates[] = $d->format('Y-m-d');
+        }
+
+        $usdRate = getCurrencyRate('USD');
+        $pdo     = getDB();
+
+        $links = $pdo->prepare("SELECT * FROM links WHERE customer_id = ? ORDER BY link_name");
+        $links->execute([currentCustomerId()]);
+        $links = $links->fetchAll();
+
+        $sh = $pdo->prepare("SELECT share_percentage FROM customers WHERE id = ?");
+        $sh->execute([currentCustomerId()]);
+        $sharePct = round((float) $sh->fetchColumn(), 2);
+        $restPct  = round(100 - $sharePct, 2);
+
+        // gam_data for the whole range, keyed by date then site.
+        $gamByDate = [];
+        if ($links) {
+            $gamStmt = $pdo->prepare("
+                SELECT g.date, g.site,
+                       MAX(g.revenue_usd * COALESCE(c.rate_to_default, 1)) AS rev_default,
+                       MAX(g.impressions) AS impressions,
+                       MAX(g.clicks)      AS clicks,
+                       MAX(g.ctr)         AS ctr
+                FROM gam_data g
+                LEFT JOIN currencies c ON c.code = COALESCE(g.gam_currency, 'USD')
+                WHERE g.date BETWEEN ? AND ?
+                GROUP BY g.date, g.site
+            ");
+            $gamStmt->execute([$from, $to]);
+            foreach ($gamStmt->fetchAll() as $row) {
+                $gamByDate[$row['date']][$row['site']] = [
+                    'rev'         => (float) $row['rev_default'],
+                    'impressions' => (int) $row['impressions'],
+                    'clicks'      => (int) $row['clicks'],
+                    'ctr'         => (float) $row['ctr'],
+                ];
+            }
+        }
+
+        $rows = [];
+        $totGAMusd = $totGAM = 0;
+        $totImpr = $totClicks = 0;
+        $siteIds = [];
+        // Newest day first.
+        foreach (array_reverse($dates) as $day) {
+            $res = $this->siteRows($links, $gamByDate[$day] ?? [], $usdRate);
+            foreach ($res['rows'] as $r) {
+                $r['date'] = $day;
+                $rows[]    = $r;
+                $siteIds[$r['link']['id']] = true;
+            }
+            $totGAMusd += $res['totGAMusd'];
+            $totGAM    += $res['totGAM'];
+            $totImpr   += $res['totImpr'];
+            $totClicks += $res['totClicks'];
+        }
+        $totCtr    = $totImpr > 0 ? round($totClicks / $totImpr * 100, 2) : null;
+        $siteCount = count($siteIds);
+
+        if ($request->query('export') === 'csv') {
+            $fmt  = fn ($v) => number_format((float) $v, 2, '.', '');
+            $pct  = fn ($p) => rtrim(rtrim(number_format($p, 2), '0'), '.') . '%';
+            $data = [];
+            foreach ($rows as $r) {
+                $share  = $r['gamINR'] * $sharePct / 100;
+                $data[] = [
+                    $r['date'],
+                    implode(', ', $r['gamSites']),
+                    $fmt($r['gamUSD'] ?? 0),
+                    $fmt($r['gamINR']),
+                    $r['ctr'] !== null ? $fmt($r['ctr']) : '',
+                    $fmt($share),
+                    $fmt($r['gamINR'] - $share),
+                ];
+            }
+            $totShare = $totGAM * $sharePct / 100;
+            $data[] = ['TOTALS', '', $fmt($totGAMusd), $fmt($totGAM), $totCtr !== null ? $fmt($totCtr) : '', $fmt($totShare), $fmt($totGAM - $totShare)];
+
+            return $this->csv('date-range-' . $from . '-to-' . $to . '.csv', [
+                'Date', 'GAM URL', 'GAM Rev ($)', 'GAM Rev (Rs)', 'CTR (%)',
+                'Share ' . $pct($sharePct) . ' (Rs)', 'Remaining ' . $pct($restPct) . ' (Rs)',
+            ], $data);
+        }
+
+        return view('customer.reports.date_range', compact(
+            'pageTitle', 'activePage', 'from', 'to', 'capped', 'maxDays', 'usdRate',
+            'rows', 'totGAMusd', 'totGAM', 'totCtr', 'totImpr', 'totClicks', 'siteCount',
+            'sharePct', 'restPct'
+        ));
+    }
+
+    /**
+     * One day's Site Wise rows for the given links: GAM revenue ($ and default
+     * currency), CTR, impressions and clicks from that day's gam_data (keyed by
+     * site), plus the day's totals. Inactive links with no data are left out.
+     */
+    private function siteRows(array $links, array $gamRaw, float $usdRate): array
+    {
         $rows = [];
         $totGAMusd = $totGAM = 0;
         $totImpr = $totClicks = 0;
@@ -107,40 +266,7 @@ class ReportsController extends Controller
             $rows[] = compact('link', 'gamSites', 'gamUSD', 'gamINR', 'ctr', 'hasData', 'gamImpr', 'gamClicks');
         }
 
-        $totCtr    = $totImpr > 0 ? round($totClicks / $totImpr * 100, 2) : null;
-
-        if ($request->query('export') === 'csv') {
-            $fmt  = fn ($v) => number_format((float) $v, 2, '.', '');
-            $pct  = fn ($p) => rtrim(rtrim(number_format($p, 2), '0'), '.') . '%';
-            $data = [];
-            foreach ($rows as $r) {
-                $share  = $r['gamINR'] * $sharePct / 100;
-                $data[] = [
-                    implode(', ', $r['gamSites']),
-                    $fmt($r['gamUSD'] ?? 0),
-                    $fmt($r['gamINR']),
-                    $r['ctr'] !== null ? $fmt($r['ctr']) : '',
-                    $fmt($share),
-                    $fmt($r['gamINR'] - $share),
-                ];
-            }
-            $totShare = $totGAM * $sharePct / 100;
-            $data[] = ['TOTALS', $fmt($totGAMusd), $fmt($totGAM), $totCtr !== null ? $fmt($totCtr) : '', $fmt($totShare), $fmt($totGAM - $totShare)];
-
-            return $this->csv('site-wise-' . $date . '.csv', [
-                'GAM URL', 'GAM Rev ($)', 'GAM Rev (Rs)', 'CTR (%)',
-                'Share ' . $pct($sharePct) . ' (Rs)', 'Remaining ' . $pct($restPct) . ' (Rs)',
-            ], $data);
-        }
-
-        $dateObj     = new DateTime($date);
-        $displayDate = $dateObj->format('d M Y') . ' (' . $dateObj->format('l') . ')';
-
-        return view('customer.reports.site_wise', compact(
-            'pageTitle', 'activePage', 'date', 'datesRaw', 'displayDate', 'usdRate',
-            'rows', 'totGAMusd', 'totGAM', 'totCtr', 'totImpr', 'totClicks',
-            'sharePct', 'restPct'
-        ));
+        return compact('rows', 'totGAMusd', 'totGAM', 'totImpr', 'totClicks');
     }
 
     /**

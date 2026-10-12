@@ -7,7 +7,12 @@
         <div class="dash-title">SITE WISE REPORT</div>
         <div class="dash-subtitle">GAM revenue, CTR and share for each of your sites</div>
     </div>
-    <div class="date-picker-wrap">
+    <div class="date-picker-wrap" style="gap:12px;flex-wrap:wrap">
+        <span class="rate-badge" title="Approximate exchange rate used to convert GAM revenue">
+            <i class="bi bi-currency-exchange"></i>
+             USD/{{ getDefaultCurrency()['code'] }} (Approx)
+            <b>{{ getDefaultCurrency()['symbol'] }}{{ number_format($usdRate, 2) }}</b>
+        </span>
         <label><i class="bi bi-calendar3"></i> Select date →</label>
         <select id="datePicker" class="form-select" style="width:auto">
             @php
@@ -64,7 +69,6 @@
             @if ($rows)
             <a href="{{ request()->fullUrlWithQuery(['export' => 'csv']) }}" class="btn-sm-custom"><i class="bi bi-download"></i> Export CSV</a>
             @endif
-            <span style="font-weight:400;font-size:11px;color:var(--text-muted)">USD/{{ getDefaultCurrency()['code'] }}: {{ number_format($usdRate, 2) }}</span>
         </div>
     </div>
     <div class="table-wrap">

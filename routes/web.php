@@ -43,6 +43,7 @@ Route::match(['get', 'post'], '/setup', [SetupController::class, 'run'])->name('
 Route::middleware('auth.customer')->group(function () {
     Route::redirect('/reports', '/reports/site-wise')->name('customer.home');
     Route::get('/reports/site-wise', [\App\Http\Controllers\Customer\ReportsController::class, 'siteWise'])->name('customer.reports.site-wise');
+    Route::get('/reports/date-range', [\App\Http\Controllers\Customer\ReportsController::class, 'dateRange'])->name('customer.reports.date-range');
     Route::get('/reports/hourly-wise', [\App\Http\Controllers\Customer\ReportsController::class, 'hourlyWise'])->name('customer.reports.hourly-wise');
     Route::get('/reports/country-wise', [\App\Http\Controllers\Customer\ReportsController::class, 'countryWise'])->name('customer.reports.country-wise');
     Route::match(['get', 'post'], '/account', [\App\Http\Controllers\Customer\AccountController::class, 'index'])->name('customer.account');

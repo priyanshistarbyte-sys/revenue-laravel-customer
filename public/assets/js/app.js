@@ -557,10 +557,8 @@ document.querySelectorAll('[data-confirm]').forEach(el => {
     modalEl.addEventListener('hidden.bs.modal', () => { activeRow = null; });
 })();
 
-// ── Table sorting ──
-(function () {
-    const table = document.getElementById('dashTable');
-    if (!table) return;
+// ── Table sorting (each customer block's table sorts on its own) ──
+document.querySelectorAll('table.dash-table').forEach(function (table) {
 
     const tbody = table.querySelector('tbody');
     let sortCol = null, sortDir = 1;
@@ -615,14 +613,17 @@ document.querySelectorAll('[data-confirm]').forEach(el => {
             sortTable(btn.closest('th'));
         });
     });
-})();
+});
 
 // ── CSV export (dashboard): exports the table exactly as shown ──
 (function () {
-    const table = document.getElementById('dashTable');
+    // One table per customer block; the grand TOTALS row lives in #dashGrandTotals.
+    const tables = Array.from(document.querySelectorAll('table.dash-table'));
+    const table  = tables[0];
+    const grand  = document.getElementById('dashGrandTotals');
     const btn   = document.getElementById('dashExportBtn');
     const domBtn = document.getElementById('dashDomainsBtn');
-    if (!table) return;
+    if (!btn && !domBtn) return;
 
     function csvCell(text) {
         text = (text || '').replace(/\s+/g, ' ').trim();
@@ -659,13 +660,14 @@ document.querySelectorAll('[data-confirm]').forEach(el => {
         return (url || '').toLowerCase().trim().replace(/^https?:\/\//, '').split('/')[0];
     }
 
-    // Iterate the visible main rows (skips breakdown + notes-filtered-out rows).
+    // Iterate the visible main rows of every customer block, collapsed or not
+    // (skips breakdown + notes-filtered-out rows). fn(row, customerName).
     function eachVisibleRow(fn) {
-        Array.from(table.tBodies[0].rows).forEach(row => {
+        tables.forEach(t => Array.from(t.tBodies[0].rows).forEach(row => {
             if (row.classList.contains('camp-sub-row')) return;
             if (row.style.display === 'none') return;
-            fn(row);
-        });
+            fn(row, t.dataset.customer || '');
+        }));
     }
 
     // Header index of the "GAM URL" column, so we can rewrite just that cell.
@@ -678,6 +680,7 @@ document.querySelectorAll('[data-confirm]').forEach(el => {
     // replaced by the registrable domain of the link's LAST GAM URL (a link may
     // map to several GAM URLs).
     function buildCsv(gamAsLastDomain) {
+        if (!table) return 'No data';
         const heads  = Array.from(table.tHead.rows[0].cells);
         const cols   = heads.length - 1;              // drop the trailing Edit column
         const gamCol = gamAsLastDomain ? gamColIndex() : -1;
@@ -686,28 +689,28 @@ document.querySelectorAll('[data-confirm]').forEach(el => {
         // Each row is a list of [main ₹ text, USD sub-line text] pairs, one per column.
         const rows = [];
 
-        eachVisibleRow(row => {
+        eachVisibleRow((row, customer) => {
             const cells = Array.from(row.cells).slice(0, cols);
             if (!cells.length) return;
-            rows.push(cells.map((c, idx) => {
+            rows.push([[customer, '']].concat(cells.map((c, idx) => {
                 if (idx === gamCol) {
                     let sites = [];
                     try { sites = JSON.parse(row.dataset.gamSites || '[]'); } catch (e) { sites = []; }
                     return [sites.length ? hostOf(sites[sites.length - 1]) : '', ''];
                 }
                 return splitCell(c);
-            }));
+            })));
         });
 
-        // TOTALS footer — expand colspans so columns stay aligned.
-        const foot = table.tFoot && table.tFoot.rows[0];
+        // Grand TOTALS footer — expand colspans so columns stay aligned.
+        const foot = grand && grand.tFoot && grand.tFoot.rows[0];
         if (foot) {
             const out = [];
             Array.from(foot.cells).forEach(c => {
                 out.push(splitCell(c));
                 for (let k = 1; k < (c.colSpan || 1); k++) out.push(['', '']);
             });
-            rows.push(out.slice(0, cols));
+            rows.push([['All customers', '']].concat(out.slice(0, cols)));
         }
 
         // Columns that carry a USD sub-line (e.g. META SPEND) get their $ value in
@@ -716,7 +719,7 @@ document.querySelectorAll('[data-confirm]').forEach(el => {
         rows.forEach(r => r.forEach(([, usd], idx) => { if (usd) usdCols.add(idx); }));
 
         const header = [];
-        headTexts.forEach((h, idx) => {
+        ['Customer'].concat(headTexts).forEach((h, idx) => {
             header.push(csvCell(h));
             if (usdCols.has(idx)) header.push(csvCell(h + ' ($)'));
         });
@@ -741,18 +744,41 @@ document.querySelectorAll('[data-confirm]').forEach(el => {
         downloadCsv(buildCsv(true), 'dashboard-last-gam-url-' + (domBtn.dataset.date || 'export') + '.csv'));
 })();
 
+// ── Customer blocks (dashboard): click a header to open (−) / close (+) its
+// block. Every page load starts with only the first block open.
+(function () {
+    const groups = Array.from(document.querySelectorAll('.cust-group'));
+    if (!groups.length) return;
+
+    function setOpen(group, open) {
+        group.classList.toggle('open', open);
+        group.querySelector('.cust-group-body').hidden = !open;
+        group.querySelector('.cust-group-head').setAttribute('aria-expanded', open ? 'true' : 'false');
+        const icon = group.querySelector('.cust-group-icon');
+        icon.classList.toggle('bi-plus-square', !open);
+        icon.classList.toggle('bi-dash-square', open);
+    }
+
+    groups.forEach((g, i) => setOpen(g, i === 0));
+
+    groups.forEach(g => g.querySelector('.cust-group-head').addEventListener('click', () =>
+        setOpen(g, !g.classList.contains('open'))));
+
+    document.querySelectorAll('[data-cust-toggle-all]').forEach(btn => btn.addEventListener('click', () =>
+        groups.forEach(g => setOpen(g, btn.dataset.custToggleAll === 'open'))));
+})();
+
 // ── Notes filter (dashboard): searchable multi-select over the link table ──
 (function () {
-    const wrap  = document.getElementById('noteFilter');
-    const table = document.getElementById('dashTable');
-    if (!wrap || !table) return;
+    const wrap   = document.getElementById('noteFilter');
+    const tables = Array.from(document.querySelectorAll('table.dash-table'));
+    if (!wrap || !tables.length) return;
 
     const btn    = document.getElementById('noteFilterBtn');
     const panel  = document.getElementById('noteFilterPanel');
     const label  = document.getElementById('noteFilterLabel');
     const search = document.getElementById('noteFilterSearch');
     const list   = document.getElementById('noteFilterList');
-    const tbody  = table.querySelector('tbody');
     const boxes  = () => Array.from(list.querySelectorAll('input[type=checkbox]'));
 
     function openPanel()  { panel.style.display = 'block'; search.value = ''; filterOptions(); search.focus(); }
@@ -789,15 +815,26 @@ document.querySelectorAll('[data-confirm]').forEach(el => {
         const active   = selected.size > 0;
         label.textContent = !active ? 'All' : (selected.size + ' selected');
 
-        Array.from(tbody.children).forEach(tr => {
-            if (tr.classList.contains('camp-sub-row')) return; // handled via its parent
-            const note = (tr.getAttribute('data-note') || '').trim();
-            const key  = note === '' ? '__empty__' : note;
-            const show = !active || selected.has(key);
-            tr.style.display = show ? '' : 'none';
+        tables.forEach(table => {
+            let shown = 0;
+            Array.from(table.tBodies[0].children).forEach(tr => {
+                if (tr.classList.contains('camp-sub-row')) return; // handled via its parent
+                const note = (tr.getAttribute('data-note') || '').trim();
+                const key  = note === '' ? '__empty__' : note;
+                const show = !active || selected.has(key);
+                tr.style.display = show ? '' : 'none';
+                if (show) shown++;
 
-            const sub = tr.nextElementSibling;
-            if (sub && sub.classList.contains('camp-sub-row') && !show) sub.style.display = 'none';
+                const sub = tr.nextElementSibling;
+                if (sub && sub.classList.contains('camp-sub-row') && !show) sub.style.display = 'none';
+            });
+
+            // Hide a customer block with no matching rows; show the matching count.
+            const group = table.closest('.cust-group');
+            if (!group) return;
+            group.style.display = shown ? '' : 'none';
+            const count = group.querySelector('.js-group-count');
+            if (count) count.textContent = shown;
         });
     }
 })();
