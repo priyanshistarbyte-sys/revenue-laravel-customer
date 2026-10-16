@@ -203,6 +203,9 @@
                 </td>
                 <td style="white-space:normal">
                     <div style="display:flex;flex-wrap:wrap;gap:4px;max-width:280px">
+                    @if (($l['link_type'] ?? 'web') === 'app')
+                    <code class="campaign-tag" style="margin:0;max-width:100%;overflow-wrap:anywhere;color:#c4b5fd" title="App ID"><i class="bi bi-phone" style="font-size:10px"></i> {{ $l['app_id'] }}@if (!empty($l['app_name'])) · {{ $l['app_name'] }}@endif</code>
+                    @endif
                     @foreach ($gamSites as $gs)
                         @php $dup = isset($dupGamSet["$uid|$gs"]); @endphp
                     <code class="campaign-tag{{ $dup ? ' dup-tag' : '' }}" style="margin:0;max-width:100%;overflow-wrap:anywhere;{{ $dup ? '' : 'color:#7dd3fc' }}" @if($dup) title="Also used in another subdomain — revenue is double-counted" @endif>
@@ -465,6 +468,17 @@
                 <input type="hidden" name="action" value="add">
                 <div class="modal-body">
                     <div class="row g-3">
+                        <div class="col-12">
+                            <label class="form-label">Type</label>
+                            <div class="d-flex gap-4">
+                                <label class="d-flex align-items-center gap-2" style="cursor:pointer;color:#fff">
+                                    <input type="radio" name="link_type" value="web" class="form-check-input m-0 js-link-type" checked> <i class="bi bi-globe"></i> Web
+                                </label>
+                                <label class="d-flex align-items-center gap-2" style="cursor:pointer;color:#fff">
+                                    <input type="radio" name="link_type" value="app" class="form-check-input m-0 js-link-type" > <i class="bi bi-phone"></i> App
+                                </label>
+                            </div>
+                        </div>
                         {!! ownerSelectHTML() !!}
                         <div class="col-md-6">
                             <label class="form-label">Main Domain <small style="color:#7dd3fc;font-weight:400">(optional — auto-detected from GAM URL)</small></label>
@@ -508,7 +522,11 @@
                             <input type="text" name="meta_url" class="form-control" placeholder="ewire1.blogonbudget.xyz" required>
                         </div>
                         @endif
-                        <div class="{{ showMeta() ? 'col-md-6' : 'col-12' }}">
+                        <div class="{{ showMeta() ? 'col-md-6' : 'col-12' }} js-app-only" style="display:none">
+                            <label class="form-label">App ID * <small style="color:#7dd3fc;font-weight:400;text-transform:none;letter-spacing:0">— app name is fetched automatically from Google Play / App Store</small></label>
+                            <input type="text" name="app_id" class="form-control" placeholder="e.g. com.example.app">
+                        </div>
+                        <div class="{{ showMeta() ? 'col-md-6' : 'col-12' }} js-web-only">
                             <label class="form-label">
                                 GAM URL / Site Host(s) *
                                 <small style="color:#7dd3fc;font-weight:400;text-transform:none;letter-spacing:0">— exact match from GAM CSV; press <kbd>Enter</kbd> or <kbd>,</kbd> to add multiple</small>
@@ -556,6 +574,7 @@
 @php
     $editCampaigns = array_filter(array_map('trim', explode(',', $editLink['meta_campaign'])));
     $editGamSites  = array_filter(array_map('trim', explode(',', $editLink['gam_url'])));
+    $editType      = ($editLink['link_type'] ?? 'web') === 'app' ? 'app' : 'web';
 @endphp
 <div class="modal fade show" id="editModal" tabindex="-1" style="display:block;background:rgba(0,0,0,.7)">
     <div class="modal-dialog modal-lg">
@@ -569,6 +588,17 @@
                 <input type="hidden" name="id" value="{{ $editLink['id'] }}">
                 <div class="modal-body">
                     <div class="row g-3">
+                        <div class="col-12">
+                            <label class="form-label">Type</label>
+                            <div class="d-flex gap-4">
+                                <label class="d-flex align-items-center gap-2" style="cursor:pointer;color:#fff">
+                                    <input type="radio" name="link_type" value="web" class="form-check-input m-0 js-link-type" {{ $editType === 'web' ? 'checked' : '' }}> <i class="bi bi-globe"></i> Web
+                                </label>
+                                <label class="d-flex align-items-center gap-2" style="cursor:pointer;color:#fff">
+                                    <input type="radio" name="link_type" value="app" class="form-check-input m-0 js-link-type" {{ $editType === 'app' ? 'checked' : '' }}> <i class="bi bi-phone"></i> App
+                                </label>
+                            </div>
+                        </div>
                         {!! ownerSelectHTML((int)($editLink['user_id'] ?? 0)) !!}
                         <div class="col-md-6">
                             <label class="form-label">Main Domain <small style="color:#7dd3fc;font-weight:400">(optional — auto-detected from GAM URL)</small></label>
@@ -616,7 +646,11 @@
                             <input type="text" name="meta_url" class="form-control" value="{{ $editLink['meta_url'] }}" required>
                         </div>
                         @endif
-                        <div class="{{ showMeta() ? 'col-md-6' : 'col-12' }}">
+                        <div class="{{ showMeta() ? 'col-md-6' : 'col-12' }} js-app-only" style="{{ $editType === 'app' ? '' : 'display:none' }}">
+                            <label class="form-label">App ID * <small style="color:#7dd3fc;font-weight:400;text-transform:none;letter-spacing:0">— app name is fetched automatically from Google Play / App Store</small></label>
+                            <input type="text" name="app_id" class="form-control" value="{{ $editLink['app_id'] ?? '' }}" placeholder="e.g. com.example.app">
+                        </div>
+                        <div class="{{ showMeta() ? 'col-md-6' : 'col-12' }} js-web-only" style="{{ $editType === 'app' ? 'display:none' : '' }}">
                             <label class="form-label">
                                 GAM URL / Site Host(s) *
                                 <small style="color:#7dd3fc;font-weight:400;text-transform:none;letter-spacing:0">— press <kbd>Enter</kbd> or <kbd>,</kbd> to add multiple</small>
@@ -822,6 +856,26 @@ document.addEventListener('DOMContentLoaded', () => {
 </script>
 @endpush
 @endif
+
+@push('scripts')
+<script>
+// ── Web / App toggle: App swaps the GAM host field for an App ID field ──
+document.addEventListener('DOMContentLoaded', () => {
+    document.querySelectorAll('#addForm, #editForm').forEach(form => {
+        const radios = form.querySelectorAll('.js-link-type');
+        const appId  = form.querySelector('input[name="app_id"]');
+        function update() {
+            const isApp = (form.querySelector('.js-link-type:checked') || {}).value === 'app';
+            form.querySelectorAll('.js-web-only').forEach(el => el.style.display = isApp ? 'none' : '');
+            form.querySelectorAll('.js-app-only').forEach(el => el.style.display = isApp ? '' : 'none');
+            if (appId) appId.required = isApp;
+        }
+        radios.forEach(r => r.addEventListener('change', update));
+        update();
+    });
+});
+</script>
+@endpush
 
 @push('scripts')
 <script>

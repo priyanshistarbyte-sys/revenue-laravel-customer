@@ -25,7 +25,9 @@
              USD/{{ getDefaultCurrency()['code'] }} (Approx)
             <b>{{ getDefaultCurrency()['symbol'] }}{{ number_format($usdRate, 2) }}</b>
         </span>
+        @include('customer.reports._type_switch')
         <form method="get" action="{{ url('/reports/date-range') }}" style="display:flex;align-items:center;gap:8px;margin:0">
+            @if ($type === 'app')<input type="hidden" name="type" value="app">@endif
             <label><i class="bi bi-calendar3"></i> Select date range →</label>
             <div class="date-filter is-range">
                 <i class="bi bi-calendar-week date-filter-icon"></i>
@@ -67,7 +69,7 @@
         <div class="kpi-value white">{{ $totCtr !== null ? number_format($totCtr, 2) . '%' : '—' }}</div>
     </div>
     <div class="kpi-card">
-        <div class="kpi-label"><i class="bi bi-globe2"></i> Sites</div>
+        <div class="kpi-label"><i class="bi {{ $type === 'app' ? 'bi-phone' : 'bi-globe2' }}"></i> {{ $type === 'app' ? 'Apps' : 'Sites' }}</div>
         <div class="kpi-value white">{{ $siteCount }}</div>
     </div>
 </div>
@@ -75,7 +77,7 @@
 <!-- Main Table -->
 <div class="data-card">
     <div class="data-card-header" style="flex-wrap:wrap">
-        <i class="bi bi-table"></i> Site Performance &mdash; {{ $dl($from) }} to {{ $dl($to) }}
+        <i class="bi bi-table"></i> {{ $type === 'app' ? 'App' : 'Site' }} Performance &mdash; {{ $dl($from) }} to {{ $dl($to) }}
         <div style="margin-left:auto;display:flex;align-items:center;gap:8px">
             @if ($rows)
             <a href="{{ request()->fullUrlWithQuery(['export' => 'csv', 'from' => $from, 'to' => $to]) }}" class="btn-sm-custom"><i class="bi bi-download"></i> Export CSV</a>
@@ -87,7 +89,12 @@
             <thead>
                 <tr>
                     <th data-sort="str">Date <span class="sort-btn">⇅</span></th>
+                    @if ($type === 'app')
+                    <th data-sort="str">App ID <span class="sort-btn">⇅</span></th>
+                    <th data-sort="str">App Name <span class="sort-btn">⇅</span></th>
+                    @else
                     <th data-sort="str">GAM URL <span class="sort-btn">⇅</span></th>
+                    @endif
                     <th data-sort="num">GAM Rev ($) <span class="sort-btn">⇅</span></th>
                     <th data-sort="num">GAM Rev (₹) <span class="sort-btn">⇅</span></th>
                     <th data-sort="num">CTR <span class="sort-btn">⇅</span></th>
@@ -99,12 +106,17 @@
             @forelse ($rows as $r)
                 <tr class="{{ $r['hasData'] ? '' : 'row-nodata' }}">
                     <td data-v="{{ $r['date'] }}" style="text-align:left;white-space:nowrap">{{ (new \DateTime($r['date']))->format('d M Y') }}</td>
+                    @if ($type === 'app')
+                    <td data-v="{{ $r['link']['app_id'] }}"><code style="color:#7dd3fc;font-size:11px;overflow-wrap:anywhere">{{ $r['link']['app_id'] ?: '—' }}</code></td>
+                    <td data-v="{{ $r['link']['app_name'] ?? '' }}" style="color:#fff">{{ ($r['link']['app_name'] ?? '') ?: '—' }}</td>
+                    @else
                     <td data-v="{{ implode(',', $r['gamSites']) }}">
                         @foreach ($r['gamSites'] as $gs)
                         <span style="color:var(--text-muted);display:inline-block">{{ $gs }}</span>@if (count($r['gamSites']) > 1)<br>@endif
                         @endforeach
                         @if (empty($r['gamSites']))<span style="color:var(--text-muted)">—</span>@endif
                     </td>
+                    @endif
                     @if (!$r['hasData'])
                     <td class="c-muted" data-v="0">$0.00</td>
                     <td class="c-muted" data-v="0">₹0.00</td>
@@ -124,13 +136,13 @@
                     @endif
                 </tr>
             @empty
-                <tr><td colspan="7" style="text-align:center;color:var(--text-muted);padding:30px">No sites are assigned to your account yet.</td></tr>
+                <tr><td colspan="{{ $type === 'app' ? 8 : 7 }}" style="text-align:center;color:var(--text-muted);padding:30px">No {{ $type === 'app' ? 'apps' : 'sites' }} are assigned to your account yet.</td></tr>
             @endforelse
             </tbody>
             @if ($rows)
             <tfoot>
                 <tr>
-                    <td style="text-align:left" colspan="2">TOTALS</td>
+                    <td style="text-align:left" colspan="{{ $type === 'app' ? 3 : 2 }}">TOTALS</td>
                     <td class="c-green" style="font-size:11px">${{ number_format($totGAMusd, 2) }}</td>
                     <td class="c-green">{{ fmtINR($totGAM) }}</td>
                     <td>{{ $totCtr !== null ? number_format($totCtr, 2) . '%' : '—' }}</td>

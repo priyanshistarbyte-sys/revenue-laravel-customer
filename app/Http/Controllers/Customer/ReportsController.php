@@ -31,9 +31,8 @@ class ReportsController extends Controller
         $usdRate = getCurrencyRate('USD');
         $pdo     = getDB();
 
-        $links = $pdo->prepare("SELECT * FROM links WHERE customer_id = ? ORDER BY link_name");
-        $links->execute([currentCustomerId()]);
-        $links = $links->fetchAll();
+        $type  = $this->reportType($request);
+        $links = $this->customerLinks($pdo, $type);
 
         // Share % from Admin → Customers (e.g. 10) and what remains (e.g. 90).
         $sh = $pdo->prepare("SELECT share_percentage FROM customers WHERE id = ?");
@@ -79,7 +78,7 @@ class ReportsController extends Controller
             foreach ($rows as $r) {
                 $share  = $r['gamINR'] * $sharePct / 100;
                 $data[] = [
-                    implode(', ', $r['gamSites']),
+                    ...$this->siteCells($r['link'], $type),
                     $fmt($r['gamUSD'] ?? 0),
                     $fmt($r['gamINR']),
                     $r['ctr'] !== null ? $fmt($r['ctr']) : '',
@@ -88,10 +87,10 @@ class ReportsController extends Controller
                 ];
             }
             $totShare = $totGAM * $sharePct / 100;
-            $data[] = ['TOTALS', $fmt($totGAMusd), $fmt($totGAM), $totCtr !== null ? $fmt($totCtr) : '', $fmt($totShare), $fmt($totGAM - $totShare)];
+            $data[] = [...$this->totalCells($type), $fmt($totGAMusd), $fmt($totGAM), $totCtr !== null ? $fmt($totCtr) : '', $fmt($totShare), $fmt($totGAM - $totShare)];
 
-            return $this->csv('site-wise-' . $date . '.csv', [
-                'GAM URL', 'GAM Rev ($)', 'GAM Rev (Rs)', 'CTR (%)',
+            return $this->csv('site-wise-' . ($type === 'app' ? 'apps-' : '') . $date . '.csv', [
+                ...$this->siteHeads($type), 'GAM Rev ($)', 'GAM Rev (Rs)', 'CTR (%)',
                 'Share ' . $pct($sharePct) . ' (Rs)', 'Remaining ' . $pct($restPct) . ' (Rs)',
             ], $data);
         }
@@ -102,7 +101,7 @@ class ReportsController extends Controller
         return view('customer.reports.site_wise', compact(
             'pageTitle', 'activePage', 'date', 'datesRaw', 'displayDate', 'usdRate',
             'rows', 'totGAMusd', 'totGAM', 'totCtr', 'totImpr', 'totClicks',
-            'sharePct', 'restPct'
+            'sharePct', 'restPct', 'type'
         ));
     }
 
@@ -134,9 +133,8 @@ class ReportsController extends Controller
         $usdRate = getCurrencyRate('USD');
         $pdo     = getDB();
 
-        $links = $pdo->prepare("SELECT * FROM links WHERE customer_id = ? ORDER BY link_name");
-        $links->execute([currentCustomerId()]);
-        $links = $links->fetchAll();
+        $type  = $this->reportType($request);
+        $links = $this->customerLinks($pdo, $type);
 
         $sh = $pdo->prepare("SELECT share_percentage FROM customers WHERE id = ?");
         $sh->execute([currentCustomerId()]);
@@ -196,7 +194,7 @@ class ReportsController extends Controller
                 $share  = $r['gamINR'] * $sharePct / 100;
                 $data[] = [
                     $r['date'],
-                    implode(', ', $r['gamSites']),
+                    ...$this->siteCells($r['link'], $type),
                     $fmt($r['gamUSD'] ?? 0),
                     $fmt($r['gamINR']),
                     $r['ctr'] !== null ? $fmt($r['ctr']) : '',
@@ -205,10 +203,10 @@ class ReportsController extends Controller
                 ];
             }
             $totShare = $totGAM * $sharePct / 100;
-            $data[] = ['TOTALS', '', $fmt($totGAMusd), $fmt($totGAM), $totCtr !== null ? $fmt($totCtr) : '', $fmt($totShare), $fmt($totGAM - $totShare)];
+            $data[] = ['TOTALS', ...array_fill(0, count($this->siteHeads($type)), ''), $fmt($totGAMusd), $fmt($totGAM), $totCtr !== null ? $fmt($totCtr) : '', $fmt($totShare), $fmt($totGAM - $totShare)];
 
-            return $this->csv('date-range-' . $from . '-to-' . $to . '.csv', [
-                'Date', 'GAM URL', 'GAM Rev ($)', 'GAM Rev (Rs)', 'CTR (%)',
+            return $this->csv('date-range-' . ($type === 'app' ? 'apps-' : '') . $from . '-to-' . $to . '.csv', [
+                'Date', ...$this->siteHeads($type), 'GAM Rev ($)', 'GAM Rev (Rs)', 'CTR (%)',
                 'Share ' . $pct($sharePct) . ' (Rs)', 'Remaining ' . $pct($restPct) . ' (Rs)',
             ], $data);
         }
@@ -216,7 +214,7 @@ class ReportsController extends Controller
         return view('customer.reports.date_range', compact(
             'pageTitle', 'activePage', 'from', 'to', 'capped', 'maxDays', 'usdRate',
             'rows', 'totGAMusd', 'totGAM', 'totCtr', 'totImpr', 'totClicks', 'siteCount',
-            'sharePct', 'restPct'
+            'sharePct', 'restPct', 'type'
         ));
     }
 
@@ -232,7 +230,7 @@ class ReportsController extends Controller
         $totImpr = $totClicks = 0;
 
         foreach ($links as $link) {
-            $gamSites  = array_values(array_filter(array_map('trim', explode(',', $link['gam_url']))));
+            $gamSites  = self::linkSites($link);
 
             $gamDefaultCur = null;
             $gamImpr = $gamClicks = 0;
@@ -301,12 +299,15 @@ class ReportsController extends Controller
             $date = $datesRaw[0] ?? date('Y-m-d', strtotime('yesterday'));
         }
 
-        // Every GAM site behind this customer's subdomains.
-        $links = $pdo->prepare("SELECT gam_url FROM links WHERE customer_id = ?");
-        $links->execute([currentCustomerId()]);
-        $sites = [];
-        foreach ($links->fetchAll(PDO::FETCH_COLUMN) as $gamUrl) {
-            foreach (array_filter(array_map('trim', explode(',', (string) $gamUrl))) as $s) $sites[$s] = true;
+        // Every GAM site (Web) or App ID (App) behind this customer's subdomains.
+        // $siteNames: App ID → App Name, for the App view.
+        $type      = $this->reportType($request);
+        $sites     = $siteNames = [];
+        foreach ($this->customerLinks($pdo, $type) as $lk) {
+            foreach (self::linkSites($lk) as $s) {
+                $sites[$s] = true;
+                if ($type === 'app') $siteNames[$s] = (string) ($lk['app_name'] ?? '');
+            }
         }
         $sites = array_keys($sites);
         sort($sites);
@@ -356,15 +357,15 @@ class ReportsController extends Controller
             $fmt  = fn ($v) => number_format((float) $v, 2, '.', '');
             $data = [];
             foreach ($rows as $r) {
-                $data[] = [$r['site'], $r['dim'], $fmt($r['ctr']), $r['req'], $fmt($r['rev']), $fmt($r['ecpm']), $r['impr']];
+                $data[] = [$r['site'], ...($type === 'app' ? [$siteNames[$r['site']] ?? ''] : []), $r['dim'], $fmt($r['ctr']), $r['req'], $fmt($r['rev']), $fmt($r['ecpm']), $r['impr']];
             }
             $data[] = [
-                'TOTALS', '', $tot['ctr'] !== null ? $fmt($tot['ctr']) : '', $tot['req'], $fmt($tot['rev']),
+                'TOTALS', ...($type === 'app' ? [''] : []), '', $tot['ctr'] !== null ? $fmt($tot['ctr']) : '', $tot['req'], $fmt($tot['rev']),
                 $tot['ecpm'] !== null ? $fmt($tot['ecpm']) : '', $tot['impr'],
             ];
 
-            return $this->csv($activePage . '-' . $date . ($site !== '' ? '-' . $site : '') . '.csv', [
-                'Site', ucfirst($dimCol), 'Ad Exchange CTR (%)', 'Ad Exchange total requests',
+            return $this->csv($activePage . '-' . ($type === 'app' ? 'apps-' : '') . $date . ($site !== '' ? '-' . $site : '') . '.csv', [
+                ...($type === 'app' ? ['App ID', 'App Name'] : ['Site']), ucfirst($dimCol), 'Ad Exchange CTR (%)', 'Ad Exchange total requests',
                 'Ad Exchange revenue ($)', 'Ad Exchange average eCPM ($)', 'Ad Exchange impressions',
             ], $data);
         }
@@ -373,8 +374,52 @@ class ReportsController extends Controller
         $displayDate = $dateObj->format('d M Y') . ' (' . $dateObj->format('l') . ')';
 
         return view($view, compact(
-            'pageTitle', 'activePage', 'date', 'datesRaw', 'displayDate', 'sites', 'site', 'rows', 'tot'
+            'pageTitle', 'activePage', 'date', 'datesRaw', 'displayDate', 'sites', 'site', 'rows', 'tot',
+            'type', 'siteNames'
         ));
+    }
+
+    /** ?type=app → the customer's App subdomains; anything else → Web. */
+    private function reportType(Request $request): string
+    {
+        return $request->query('type') === 'app' ? 'app' : 'web';
+    }
+
+    /** This customer's subdomains of one type; App ones get their store name filled in. */
+    private function customerLinks(\PDO $pdo, string $type): array
+    {
+        $stmt = $pdo->prepare("SELECT * FROM links WHERE customer_id = ? AND COALESCE(link_type, 'web') = ? ORDER BY link_name");
+        $stmt->execute([currentCustomerId(), $type]);
+        $links = $stmt->fetchAll();
+        if ($type === 'app') \App\Services\AppNameLookup::fillMissing($pdo, $links);
+        return $links;
+    }
+
+    /** GAM "site" keys a link earns under: its App ID for an App, else its GAM host(s). */
+    private static function linkSites(array $link): array
+    {
+        if (($link['link_type'] ?? 'web') === 'app') {
+            return array_values(array_filter([trim((string) ($link['app_id'] ?? ''))]));
+        }
+        return array_values(array_filter(array_map('trim', explode(',', (string) $link['gam_url']))));
+    }
+
+    /** CSV identity columns for Site Wise / Date Range: GAM URL (Web) or App ID + App Name (App). */
+    private function siteHeads(string $type): array
+    {
+        return $type === 'app' ? ['App ID', 'App Name'] : ['GAM URL'];
+    }
+
+    private function siteCells(array $link, string $type): array
+    {
+        return $type === 'app'
+            ? [(string) ($link['app_id'] ?? ''), (string) ($link['app_name'] ?? '')]
+            : [implode(', ', self::linkSites($link))];
+    }
+
+    private function totalCells(string $type): array
+    {
+        return $type === 'app' ? ['TOTALS', ''] : ['TOTALS'];
     }
 
     /** Stream rows as a CSV download (UTF-8 BOM so Excel reads it correctly). */

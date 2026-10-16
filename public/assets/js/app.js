@@ -124,9 +124,17 @@ document.addEventListener('DOMContentLoaded', () => {
         form.addEventListener('submit', e => {
             const camp = form.querySelector('[name="meta_campaign"]');
             const gam  = form.querySelector('[name="gam_url"]');
+            const appId = form.querySelector('[name="app_id"]');
+            const isApp = (form.querySelector('[name="link_type"]:checked') || {}).value === 'app';
             if (camp && !camp.value.trim()) {
                 e.preventDefault();
                 alert('Please add at least one Meta campaign name.');
+            } else if (isApp) {
+                // App subdomains use an App ID instead of GAM hosts.
+                if (!appId || !appId.value.trim()) {
+                    e.preventDefault();
+                    alert('Please enter the App ID.');
+                }
             } else if (!gam || !gam.value.trim()) {
                 e.preventDefault();
                 alert('Please add at least one GAM URL / site host.');
@@ -617,8 +625,8 @@ document.querySelectorAll('table.dash-table').forEach(function (table) {
 
 // ── CSV export (dashboard): exports the table exactly as shown ──
 (function () {
-    // One table per customer block; the grand TOTALS row lives in #dashGrandTotals.
-    const tables = Array.from(document.querySelectorAll('table.dash-table'));
+    // One web table per customer block; the grand TOTALS row lives in #dashGrandTotals.
+    const tables = Array.from(document.querySelectorAll('table.dash-table:not([data-type="app"])'));
     const table  = tables[0];
     const grand  = document.getElementById('dashGrandTotals');
     const btn   = document.getElementById('dashExportBtn');
@@ -768,6 +776,55 @@ document.querySelectorAll('table.dash-table').forEach(function (table) {
         groups.forEach(g => setOpen(g, btn.dataset.custToggleAll === 'open'))));
 })();
 
+// ── Web / App switch in each customer block header (dashboard) ──
+// Visible main rows of a block table (skips breakdown + placeholder + filtered rows).
+function dashRowCount(table) {
+    return Array.from(table.tBodies[0].rows).filter(tr =>
+        !tr.classList.contains('camp-sub-row') && !tr.classList.contains('js-empty-row') && tr.style.display !== 'none'
+    ).length;
+}
+// Re-sync a block's count with whichever type (web / app) it currently shows.
+function dashRefreshGroup(group) {
+    const type  = group.dataset.type || 'web';
+    const table = group.querySelector('table.dash-table[data-type="' + type + '"]');
+    const count = group.querySelector('.js-group-count');
+    const unit  = group.querySelector('.js-group-unit');
+    if (count && table) count.textContent = dashRowCount(table);
+    if (unit) unit.textContent = type === 'app' ? 'app(s)' : 'link(s)';
+}
+(function () {
+    function select(group, type) {
+        group.dataset.type = type;
+        group.querySelectorAll('.js-type-opt').forEach(o => {
+            const on = o.dataset.type === type;
+            o.classList.toggle('active', on);
+            o.setAttribute('aria-checked', on ? 'true' : 'false');
+            o.tabIndex = on ? 0 : -1;
+        });
+        group.querySelectorAll('.js-type-pane').forEach(p => { p.hidden = p.dataset.type !== type; });
+        dashRefreshGroup(group);
+        // Picking a type on a closed block opens it, so the rows are visible.
+        if (!group.classList.contains('open')) group.querySelector('.cust-group-head').click();
+    }
+    document.querySelectorAll('.js-type-opt').forEach(opt => {
+        // The switch lives inside the header <button>: don't let it collapse the block.
+        opt.addEventListener('click', e => {
+            e.stopPropagation();
+            e.preventDefault();
+            select(opt.closest('.cust-group'), opt.dataset.type);
+        });
+        opt.addEventListener('keydown', e => {
+            if (!['Enter', ' ', 'ArrowLeft', 'ArrowRight'].includes(e.key)) return;
+            e.stopPropagation();
+            e.preventDefault();
+            const group = opt.closest('.cust-group');
+            const type  = e.key.startsWith('Arrow') ? (opt.dataset.type === 'web' ? 'app' : 'web') : opt.dataset.type;
+            select(group, type);
+            group.querySelector('.js-type-opt[data-type="' + type + '"]').focus();
+        });
+    });
+})();
+
 // ── Notes filter (dashboard): searchable multi-select over the link table ──
 (function () {
     const wrap   = document.getElementById('noteFilter');
@@ -819,6 +876,7 @@ document.querySelectorAll('table.dash-table').forEach(function (table) {
             let shown = 0;
             Array.from(table.tBodies[0].children).forEach(tr => {
                 if (tr.classList.contains('camp-sub-row')) return; // handled via its parent
+                if (tr.classList.contains('js-empty-row')) return; // "No apps" placeholder
                 const note = (tr.getAttribute('data-note') || '').trim();
                 const key  = note === '' ? '__empty__' : note;
                 const show = !active || selected.has(key);
@@ -829,12 +887,12 @@ document.querySelectorAll('table.dash-table').forEach(function (table) {
                 if (sub && sub.classList.contains('camp-sub-row') && !show) sub.style.display = 'none';
             });
 
-            // Hide a customer block with no matching rows; show the matching count.
-            const group = table.closest('.cust-group');
-            if (!group) return;
-            group.style.display = shown ? '' : 'none';
-            const count = group.querySelector('.js-group-count');
-            if (count) count.textContent = shown;
+        });
+        // Hide a customer block with no matching rows (Web or App); show the matching count.
+        document.querySelectorAll('.cust-group').forEach(group => {
+            const any = Array.from(group.querySelectorAll('table.dash-table')).some(t => dashRowCount(t) > 0);
+            group.style.display = (!active || any) ? '' : 'none';
+            dashRefreshGroup(group);
         });
     }
 })();

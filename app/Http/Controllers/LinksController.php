@@ -412,15 +412,27 @@ class LinksController extends Controller
             $domainId     = (int) $request->input('domain_id', 0) ?: null;
             $customerId   = $this->resolveCustomerId($pdo, $request);
             $metaCampaign = implode(',', array_filter(array_map('trim', explode(',', $request->input('meta_campaign', '')))));
-            $linkName     = normalizeUrl(explode(',', $gamUrl)[0] ?? '');   // subdomain = first GAM host
+            // Web = GAM site host(s); App = a mobile App ID in place of the hosts.
+            $linkType     = $request->input('link_type') === 'app' ? 'app' : 'web';
+            $appId        = trim((string) $request->input('app_id', ''));
+            $appName      = '';
+            if ($linkType === 'app') { $gamUrl = ''; } else { $appId = $appName = ''; }
+            // App name is never typed in — it's fetched from the store (Google Play / App Store).
+            if ($linkType === 'app' && $appId !== '') {
+                $appName = (string) \App\Services\AppNameLookup::find($appId);
+            }
+            $linkName     = $linkType === 'app'
+                ? $appId                                                       // subdomain = App ID
+                : normalizeUrl(explode(',', $gamUrl)[0] ?? '');                // subdomain = first GAM host
             if (!showMeta()) {
                 // Meta hidden: the form has no campaign / Meta URL fields.
                 $metaCampaign = $metaUrl = '';
             }
-            if (!$gamUrl || (showMeta() && (!$metaCampaign || !$metaUrl))) {
+            $target = $linkType === 'app' ? 'App ID' : 'GAM URL';
+            if (($linkType === 'app' ? !$appId : !$gamUrl) || (showMeta() && (!$metaCampaign || !$metaUrl))) {
                 $flash = ['type' => 'error', 'msg' => showMeta()
-                    ? 'Meta campaign, Meta URL and GAM URL are required.'
-                    : 'GAM URL is required.'];
+                    ? "Meta campaign, Meta URL and $target are required."
+                    : "$target is required."];
             } else {
                 try {
                     $adxId    = $this->resolveAdxId($request);
@@ -432,8 +444,8 @@ class LinksController extends Controller
                     if ($extraDomains) $autoNote .= ' Added to Domains: ' . implode(', ', $extraDomains) . '.';
                     // Remembered so the Deploy modal defaults to the same server.
                     $dnsServerId = (int) $request->input('dns_server_id', 0) ?: null;
-                    $pdo->prepare("INSERT INTO links (user_id, domain_id, adx_id, customer_id, link_name, meta_campaign, meta_url, meta_host, gam_url, notes, dns_server_id, created_at, updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,NOW(),NOW())")
-                        ->execute([resolveOwnerId(), $domainId, $adxId, $customerId, $linkName, $metaCampaign, $metaUrl, normalizeUrl($metaUrl), $gamUrl, $notes, $dnsServerId]);
+                    $pdo->prepare("INSERT INTO links (user_id, domain_id, adx_id, customer_id, link_name, link_type, app_id, app_name, meta_campaign, meta_url, meta_host, gam_url, notes, dns_server_id, created_at, updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,NOW(),NOW())")
+                        ->execute([resolveOwnerId(), $domainId, $adxId, $customerId, $linkName, $linkType, $appId ?: null, $appName ?: null, $metaCampaign, $metaUrl, normalizeUrl($metaUrl), $gamUrl, $notes, $dnsServerId]);
                     $newId = (int) $pdo->lastInsertId();   // read before any further queries
 
                     @set_time_limit(0);
@@ -524,7 +536,24 @@ class LinksController extends Controller
             $domainId     = (int) $request->input('domain_id', 0) ?: null;
             $customerId   = $this->resolveCustomerId($pdo, $request);
             $metaCampaign = implode(',', array_filter(array_map('trim', explode(',', $request->input('meta_campaign', '')))));
-            $linkName     = normalizeUrl(explode(',', $gamUrl)[0] ?? '');   // subdomain = first GAM host
+            // Web = GAM site host(s); App = a mobile App ID in place of the hosts.
+            $linkType     = $request->input('link_type') === 'app' ? 'app' : 'web';
+            $appId        = trim((string) $request->input('app_id', ''));
+            $appName      = '';
+            if ($linkType === 'app') { $gamUrl = ''; } else { $appId = $appName = ''; }
+            // App name is never typed in — it's fetched from the store (Google Play / App Store).
+            // Same App ID as before → keep the name already stored instead of re-fetching.
+            if ($linkType === 'app' && $appId !== '') {
+                $prev = $pdo->prepare("SELECT app_id, app_name FROM links WHERE id = ? AND " . scopeSQL());
+                $prev->execute([$id]);
+                $prev = $prev->fetch() ?: [];
+                $appName = ($prev['app_id'] ?? '') === $appId && trim((string) ($prev['app_name'] ?? '')) !== ''
+                    ? (string) $prev['app_name']
+                    : (string) \App\Services\AppNameLookup::find($appId);
+            }
+            $linkName     = $linkType === 'app'
+                ? $appId                                                       // subdomain = App ID
+                : normalizeUrl(explode(',', $gamUrl)[0] ?? '');                // subdomain = first GAM host
             if (!showMeta() && $id) {
                 // Meta hidden: the form has no campaign / Meta URL fields — keep what's stored.
                 $keep = $pdo->prepare("SELECT meta_campaign, meta_url FROM links WHERE id = ? AND " . scopeSQL());
@@ -533,7 +562,7 @@ class LinksController extends Controller
                 $metaCampaign = (string) ($kept['meta_campaign'] ?? '');
                 $metaUrl      = (string) ($kept['meta_url'] ?? '');
             }
-            if ($id && $gamUrl && (!showMeta() || ($metaCampaign && $metaUrl))) {
+            if ($id && ($linkType === 'app' ? $appId : $gamUrl) && (!showMeta() || ($metaCampaign && $metaUrl))) {
                 try {
                     // If the GAM URL change alters the derived MAIN_URL, the deployed
                     // Meta sub-site is now stale → flag it so the UI prompts a re-deploy.
@@ -554,8 +583,8 @@ class LinksController extends Controller
                     $adxId    = $this->effectiveAdxId($pdo, $domainId, $adxId);
                     $extraDomains = $this->ensureGamDomains($pdo, $gamUrl, $adxId, $linkName);
                     if ($extraDomains) $autoNote .= ' Added to Domains: ' . implode(', ', $extraDomains) . '.';
-                    $pdo->prepare("UPDATE links SET user_id=?, domain_id=?, adx_id=?, customer_id=?, link_name=?, meta_campaign=?, meta_url=?, meta_host=?, gam_url=?, notes=?, needs_redeploy=GREATEST(needs_redeploy, ?), updated_at=NOW() WHERE id=? AND " . scopeSQL())
-                        ->execute([resolveOwnerId(), $domainId, $adxId, $customerId, $linkName, $metaCampaign, $metaUrl, normalizeUrl($metaUrl), $gamUrl, $notes, $mainChanged ? 1 : 0, $id]);
+                    $pdo->prepare("UPDATE links SET user_id=?, domain_id=?, adx_id=?, customer_id=?, link_name=?, link_type=?, app_id=?, app_name=?, meta_campaign=?, meta_url=?, meta_host=?, gam_url=?, notes=?, needs_redeploy=GREATEST(needs_redeploy, ?), updated_at=NOW() WHERE id=? AND " . scopeSQL())
+                        ->execute([resolveOwnerId(), $domainId, $adxId, $customerId, $linkName, $linkType, $appId ?: null, $appName ?: null, $metaCampaign, $metaUrl, normalizeUrl($metaUrl), $gamUrl, $notes, $mainChanged ? 1 : 0, $id]);
 
                     @set_time_limit(0);
                     $autoNote .= $this->ensureHostAdUnits($pdo, $gamUrl, $adxId);

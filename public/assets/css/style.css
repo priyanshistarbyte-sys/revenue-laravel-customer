@@ -220,6 +220,22 @@ body { background: var(--header-bg); color: var(--text); font-family: 'Segoe UI'
 .cust-stat b.c-orange { color: var(--orange); }
 .cust-stat b.c-red { color: var(--red); }
 @media (max-width: 767px) { .cust-group-stats { margin-left: 0; width: 100%; } .cust-stat { flex: 1; align-items: flex-start; } }
+.js-type-pane[hidden] { display: none !important; }
+/* Web / App switch in a customer block header (sits just left of the stats) */
+.type-switch {
+    margin-left: auto; display: inline-flex; padding: 3px; gap: 2px;
+    background: var(--card-bg); border: 1px solid var(--border); border-radius: 8px;
+}
+.type-switch + .cust-group-stats, .type-switch ~ .cust-group-stats { margin-left: 4px; }
+.type-opt {
+    display: inline-flex; align-items: center; gap: 5px; padding: 5px 12px; border-radius: 6px;
+    color: var(--text-muted); font-size: 12px; font-weight: 600; cursor: pointer; user-select: none;
+}
+.type-opt em { font-style: normal; font-size: 10px; opacity: .75; }
+.type-opt:hover { color: #fff; }
+.type-opt.active { background: var(--purple); color: #fff; }
+.type-opt:focus-visible { outline: 2px solid #a78bfa; outline-offset: 1px; }
+@media (max-width: 767px) { .type-switch { margin-left: 0; } }
 
 /* ── Searchable select (combobox) ── */
 .ss-wrap { position: relative; }

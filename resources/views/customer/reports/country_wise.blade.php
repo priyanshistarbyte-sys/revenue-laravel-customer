@@ -8,11 +8,12 @@
         <div class="dash-subtitle">Ad Exchange performance broken down by country</div>
     </div>
     <div class="date-picker-wrap" style="gap:8px;flex-wrap:wrap">
-        <label><i class="bi bi-globe2"></i> Site</label>
+        @include('customer.reports._type_switch')
+        <label><i class="bi {{ $type === 'app' ? 'bi-phone' : 'bi-globe2' }}"></i> {{ $type === 'app' ? 'App' : 'Site' }}</label>
         <select id="sitePicker" class="form-select" style="width:auto">
-            <option value="">All sites</option>
+            <option value="">All {{ $type === 'app' ? 'apps' : 'sites' }}</option>
             @foreach ($sites as $s)
-            <option value="{{ $s }}" {{ $s === $site ? 'selected' : '' }}>{{ $s }}</option>
+            <option value="{{ $s }}" {{ $s === $site ? 'selected' : '' }}>{{ $type === 'app' && ($siteNames[$s] ?? '') !== '' ? $siteNames[$s] . ' (' . $s . ')' : $s }}</option>
             @endforeach
         </select>
         <label><i class="bi bi-calendar3"></i> Date</label>
@@ -64,7 +65,12 @@
         <table class="ledger" id="countryTable">
             <thead>
                 <tr>
+                    @if ($type === 'app')
+                    <th data-sort="str">App ID <span class="sort-btn">⇅</span></th>
+                    <th data-sort="str">App Name <span class="sort-btn">⇅</span></th>
+                    @else
                     <th data-sort="str">Site <span class="sort-btn">⇅</span></th>
+                    @endif
                     <th data-sort="str">Country <span class="sort-btn">⇅</span></th>
                     <th data-sort="num">Ad Exchange CTR <span class="sort-btn">⇅</span></th>
                     <th data-sort="num">Ad Exchange total requests <span class="sort-btn">⇅</span></th>
@@ -76,7 +82,12 @@
             <tbody>
             @forelse ($rows as $r)
                 <tr>
+                    @if ($type === 'app')
+                    <td data-v="{{ $r['site'] }}"><code style="color:#7dd3fc;font-size:11px;overflow-wrap:anywhere">{{ $r['site'] }}</code></td>
+                    <td data-v="{{ $siteNames[$r['site']] ?? '' }}" style="color:#fff">{{ ($siteNames[$r['site']] ?? '') ?: '—' }}</td>
+                    @else
                     <td data-v="{{ $r['site'] }}" style="color:var(--text-muted)">{{ $r['site'] }}</td>
+                    @endif
                     <td data-v="{{ $r['dim'] }}">{{ $r['dim'] }}</td>
                     <td data-v="{{ $r['ctr'] }}">{{ rtrim(rtrim(number_format($r['ctr'], 2), '0'), '.') }}%</td>
                     <td data-v="{{ $r['req'] }}">{{ number_format($r['req']) }}</td>
@@ -85,15 +96,15 @@
                     <td data-v="{{ $r['impr'] }}">{{ number_format($r['impr']) }}</td>
                 </tr>
             @empty
-                <tr><td colspan="7" style="text-align:center;color:var(--text-muted);padding:30px">
-                    {{ $sites ? 'No country data for this date.' : 'No sites are assigned to your account yet.' }}
+                <tr><td colspan="{{ $type === 'app' ? 8 : 7 }}" style="text-align:center;color:var(--text-muted);padding:30px">
+                    {{ $sites ? 'No country data for this date.' : ($type === 'app' ? 'No apps are assigned to your account yet.' : 'No sites are assigned to your account yet.') }}
                 </td></tr>
             @endforelse
             </tbody>
             @if ($rows)
             <tfoot>
                 <tr>
-                    <td style="text-align:left">TOTALS</td>
+                    <td style="text-align:left" @if ($type === 'app') colspan="2" @endif>TOTALS</td>
                     <td></td>
                     <td>{{ $tot['ctr'] !== null ? number_format($tot['ctr'], 2) . '%' : '—' }}</td>
                     <td>{{ number_format($tot['req']) }}</td>

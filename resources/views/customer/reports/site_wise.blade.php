@@ -8,6 +8,7 @@
         <div class="dash-subtitle">GAM revenue, CTR and share for each of your sites</div>
     </div>
     <div class="date-picker-wrap" style="gap:12px;flex-wrap:wrap">
+        @include('customer.reports._type_switch')
         <span class="rate-badge" title="Approximate exchange rate used to convert GAM revenue">
             <i class="bi bi-currency-exchange"></i>
              USD/{{ getDefaultCurrency()['code'] }} (Approx)
@@ -56,7 +57,7 @@
         <div class="kpi-value white">{{ $totCtr !== null ? number_format($totCtr, 2) . '%' : '—' }}</div>
     </div>
     <div class="kpi-card">
-        <div class="kpi-label"><i class="bi bi-globe2"></i> Sites</div>
+        <div class="kpi-label"><i class="bi {{ $type === 'app' ? 'bi-phone' : 'bi-globe2' }}"></i> {{ $type === 'app' ? 'Apps' : 'Sites' }}</div>
         <div class="kpi-value white">{{ count($rows) }}</div>
     </div>
 </div>
@@ -64,7 +65,7 @@
 <!-- Main Table -->
 <div class="data-card">
     <div class="data-card-header" style="flex-wrap:wrap">
-        <i class="bi bi-table"></i> Site Performance &mdash; {{ $displayDate }}
+        <i class="bi bi-table"></i> {{ $type === 'app' ? 'App' : 'Site' }} Performance &mdash; {{ $displayDate }}
         <div style="margin-left:auto;display:flex;align-items:center;gap:8px">
             @if ($rows)
             <a href="{{ request()->fullUrlWithQuery(['export' => 'csv']) }}" class="btn-sm-custom"><i class="bi bi-download"></i> Export CSV</a>
@@ -75,7 +76,12 @@
         <table class="ledger" id="siteTable">
             <thead>
                 <tr>
+                    @if ($type === 'app')
+                    <th data-sort="str">App ID <span class="sort-btn">⇅</span></th>
+                    <th data-sort="str">App Name <span class="sort-btn">⇅</span></th>
+                    @else
                     <th data-sort="str">GAM URL <span class="sort-btn">⇅</span></th>
+                    @endif
                     <th data-sort="num">GAM Rev ($) <span class="sort-btn">⇅</span></th>
                     <th data-sort="num">GAM Rev (₹) <span class="sort-btn">⇅</span></th>
                     <th data-sort="num">CTR <span class="sort-btn">⇅</span></th>
@@ -86,12 +92,17 @@
             <tbody>
             @forelse ($rows as $r)
                 <tr class="{{ $r['hasData'] ? '' : 'row-nodata' }}">
+                    @if ($type === 'app')
+                    <td data-v="{{ $r['link']['app_id'] }}"><code style="color:#7dd3fc;font-size:11px;overflow-wrap:anywhere">{{ $r['link']['app_id'] ?: '—' }}</code></td>
+                    <td data-v="{{ $r['link']['app_name'] ?? '' }}" style="color:#fff">{{ ($r['link']['app_name'] ?? '') ?: '—' }}</td>
+                    @else
                     <td data-v="{{ implode(',', $r['gamSites']) }}">
                         @foreach ($r['gamSites'] as $gs)
                         <span style="color:var(--text-muted);display:inline-block">{{ $gs }}</span>@if (count($r['gamSites']) > 1)<br>@endif
                         @endforeach
                         @if (empty($r['gamSites']))<span style="color:var(--text-muted)">—</span>@endif
                     </td>
+                    @endif
                     @if (!$r['hasData'])
                     <td class="c-muted" data-v="0">$0.00</td>
                     <td class="c-muted" data-v="0">₹0.00</td>
@@ -111,13 +122,13 @@
                     @endif
                 </tr>
             @empty
-                <tr><td colspan="6" style="text-align:center;color:var(--text-muted);padding:30px">No sites are assigned to your account yet.</td></tr>
+                <tr><td colspan="{{ $type === 'app' ? 7 : 6 }}" style="text-align:center;color:var(--text-muted);padding:30px">No {{ $type === 'app' ? 'apps' : 'sites' }} are assigned to your account yet.</td></tr>
             @endforelse
             </tbody>
             @if ($rows)
             <tfoot>
                 <tr>
-                    <td style="text-align:left">TOTALS</td>
+                    <td style="text-align:left" @if ($type === 'app') colspan="2" @endif>TOTALS</td>
                     <td class="c-green" style="font-size:11px">${{ number_format($totGAMusd, 2) }}</td>
                     <td class="c-green">{{ fmtINR($totGAM) }}</td>
                     <td>{{ $totCtr !== null ? number_format($totCtr, 2) . '%' : '—' }}</td>

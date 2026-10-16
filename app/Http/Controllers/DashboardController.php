@@ -55,6 +55,9 @@ class DashboardController extends Controller
                                   LEFT JOIN customers cu ON cu.id=l.customer_id
                                   WHERE $linkScope $adxWhere $customerWhere ORDER BY l.link_name")->fetchAll();
 
+            // App subdomains saved without a name: fetch it from the store once and keep it.
+            \App\Services\AppNameLookup::fillMissing($pdo, $links);
+
             // Map of domain name → ADX name, used to resolve a link's ADX from its
             // GAM host (a link may map to several GAM sites / domains).
             foreach ($pdo->query("SELECT LOWER(d.name) AS name, a.name AS adx_name
@@ -122,7 +125,11 @@ class DashboardController extends Controller
 
         foreach ($links as $link) {
             $campaigns = array_filter(array_map('trim', explode(',', $link['meta_campaign'])));
-            $gamSites  = array_values(array_filter(array_map('trim', explode(',', $link['gam_url']))));
+            $isApp     = ($link['link_type'] ?? 'web') === 'app';
+            // App subdomains earn under their App ID (GAM "site" of app inventory).
+            $gamSites  = $isApp
+                ? array_values(array_filter([trim((string) ($link['app_id'] ?? ''))]))
+                : array_values(array_filter(array_map('trim', explode(',', $link['gam_url']))));
 
             $metaSpend         = null;
             $campaignBreakdown = [];
@@ -165,7 +172,7 @@ class DashboardController extends Controller
 
             // ADX network — resolved from the LAST GAM site's domain (longest match).
             $adxName = null;
-            if (!empty($gamSites)) {
+            if (!empty($gamSites) && !$isApp) {
                 $host = normalizeUrl($gamSites[array_key_last($gamSites)]);
                 $bestLen = -1;
                 foreach ($domAdx as $dName => $aName) {
@@ -194,7 +201,7 @@ class DashboardController extends Controller
                 if ($netPL >= 0) $cntProfit++; else $cntLoss++;
             }
 
-            $rows[] = compact('link', 'gamSites', 'adxName', 'gamINR', 'gamUSD', 'spend', 'gst', 'cost', 'netPL', 'margin', 'hasData', 'metaSpend', 'campaignBreakdown', 'gamImpr', 'gamClicks', 'ctr');
+            $rows[] = compact('link', 'gamSites', 'adxName', 'gamINR', 'gamUSD', 'spend', 'gst', 'cost', 'netPL', 'margin', 'hasData', 'metaSpend', 'campaignBreakdown', 'gamImpr', 'gamClicks', 'ctr', 'isApp');
         }
 
         $totMargin = $totCost > 0 ? round($totNetPL / $totCost * 100, 1) : 0;
@@ -202,17 +209,32 @@ class DashboardController extends Controller
 
         // ── Customer-wise blocks: rows grouped by assigned customer (unassigned
         // first, then A→Z), each with its own subtotals. Rows keep their index for sub-row ids.
+        // Each block also keeps Web and App rows/totals apart (header Web/App toggle).
+        $blank  = ['rows' => [], 'gamUSD' => 0.0, 'gamINR' => 0.0, 'meta' => 0.0, 'gst' => 0.0, 'cost' => 0.0,
+                   'netPL' => 0.0, 'impr' => 0, 'clicks' => 0, 'profit' => 0, 'loss' => 0];
         $groups = [];
         foreach ($rows as $ri => $r) {
             $cid = (int) ($r['link']['customer_id'] ?? 0);
             $key = $cid > 0 ? 'c' . $cid : 'none';
             $groups[$key] ??= [
                 'name' => $cid > 0 ? ($r['link']['customer_name'] ?? ('Customer #' . $cid)) : 'No customer',
-                'rows' => [], 'gamUSD' => 0.0, 'gamINR' => 0.0, 'meta' => 0.0, 'gst' => 0.0, 'cost' => 0.0,
-                'netPL' => 0.0, 'impr' => 0, 'clicks' => 0, 'profit' => 0, 'loss' => 0,
-            ];
+            ] + $blank + ['types' => ['web' => $blank, 'app' => $blank]];
             $g = &$groups[$key];
             $g['rows'][$ri] = $r;
+            $t = &$g['types'][$r['isApp'] ? 'app' : 'web'];
+            $t['rows'][$ri] = $r;
+            if ($r['hasData']) {
+                $t['gamUSD'] += $r['gamUSD'] ?? 0;
+                $t['gamINR'] += $r['gamINR'];
+                $t['meta']   += $r['spend'];
+                $t['gst']    += $r['gst'];
+                $t['cost']   += $r['cost'];
+                $t['netPL']  += $r['netPL'];
+                $t['impr']   += $r['gamImpr'];
+                $t['clicks'] += $r['gamClicks'];
+                if ($r['netPL'] >= 0) $t['profit']++; else $t['loss']++;
+            }
+            unset($t);
             if ($r['hasData']) {
                 $g['gamUSD'] += $r['gamUSD'] ?? 0;
                 $g['gamINR'] += $r['gamINR'];
@@ -226,9 +248,15 @@ class DashboardController extends Controller
             }
             unset($g);
         }
+        $ratios = function (array $x): array {
+            $x['margin'] = $x['cost'] > 0 ? round($x['netPL'] / $x['cost'] * 100, 1) : 0;
+            $x['ctr']    = $x['impr'] > 0 ? round($x['clicks'] / $x['impr'] * 100, 2) : null;
+            return $x;
+        };
         foreach ($groups as &$g) {
-            $g['margin'] = $g['cost'] > 0 ? round($g['netPL'] / $g['cost'] * 100, 1) : 0;
-            $g['ctr']    = $g['impr'] > 0 ? round($g['clicks'] / $g['impr'] * 100, 2) : null;
+            $g = $ratios($g);
+            $g['types']['web'] = $ratios($g['types']['web']);
+            $g['types']['app'] = $ratios($g['types']['app']);
         }
         unset($g);
         uksort($groups, fn ($a, $b) => $a === 'none' ? -1 : ($b === 'none' ? 1 : strnatcasecmp($groups[$a]['name'], $groups[$b]['name'])));
@@ -273,7 +301,7 @@ class DashboardController extends Controller
 
         try {
             $pdo  = getDB();
-            $stmt = $pdo->prepare("SELECT l.id, l.link_name, l.meta_url, l.meta_campaign, l.gam_url
+            $stmt = $pdo->prepare("SELECT l.id, l.link_name, l.meta_url, l.meta_campaign, l.gam_url, l.link_type, l.app_id
                                    FROM links l LEFT JOIN domains d ON d.id = l.domain_id
                                    WHERE l.id = ? AND " . linkScopeWhere('l', 'd'));
             $stmt->execute([$linkId]);
@@ -283,7 +311,9 @@ class DashboardController extends Controller
             }
 
             $campaigns = array_values(array_unique(array_filter(array_map('trim', explode(',', $link['meta_campaign'])))));
-            $sites     = array_values(array_unique(array_filter(array_map('trim', explode(',', $link['gam_url'])))));
+            $sites     = ($link['link_type'] ?? 'web') === 'app'
+                ? array_values(array_filter([trim((string) $link['app_id'])]))
+                : array_values(array_unique(array_filter(array_map('trim', explode(',', $link['gam_url'])))));
 
             $metaByDate = [];
             if ($campaigns) {

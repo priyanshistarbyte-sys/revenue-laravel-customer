@@ -181,20 +181,26 @@
         <i class="bi bi-plus-square cust-group-icon"></i>
         <i class="bi bi-person-vcard" style="color:#c4b5fd"></i>
         <span class="cust-group-name">{{ $g['name'] }}</span>
-        <span class="cust-group-meta"><span class="js-group-count">{{ count($g['rows']) }}</span> link(s)</span>
-        <span class="cust-group-stats">
-            <span class="cust-stat"><small>GAM Rev ($)</small><b class="c-green">${{ number_format($g['gamUSD'], 2) }}</b></span>
-            <span class="cust-stat"><small>GAM Revenue (₹)</small><b class="c-green">{{ fmtINR($g['gamINR']) }}</b></span>
+        <span class="cust-group-meta"><span class="js-group-count">{{ count($g['types']['web']['rows']) }}</span> <span class="js-group-unit">link(s)</span></span>
+        {{-- Web / App switch: spans, not inputs, since the whole header is a <button> --}}
+        <span class="type-switch" role="radiogroup" aria-label="Show web or app">
+            <span class="type-opt active js-type-opt" role="radio" aria-checked="true" tabindex="0" data-type="web"><i class="bi bi-globe"></i> Web <em>{{ count($g['types']['web']['rows']) }}</em></span>
+            <span class="type-opt js-type-opt" role="radio" aria-checked="false" tabindex="-1" data-type="app"><i class="bi bi-phone"></i> App <em>{{ count($g['types']['app']['rows']) }}</em></span>
+        </span>
+        {{-- Block totals cover Web + App together, whichever type is shown below --}}
+        <span class="cust-group-stats" title="Web + App combined">
+            <span class="cust-stat"><small>GAM Rev ($) · Web + App</small><b class="c-green">${{ number_format($g['gamUSD'], 2) }}</b></span>
+            <span class="cust-stat"><small>GAM Revenue (₹) · Web + App</small><b class="c-green">{{ fmtINR($g['gamINR']) }}</b></span>
             @if (showMeta())
             <span class="cust-stat"><small>Meta Spend</small><b class="c-orange">{{ fmtINR($g['meta']) }}</b></span>
             <span class="cust-stat"><small>Net P/L</small><b class="{{ $g['netPL'] >= 0 ? 'c-green' : 'c-red' }}">{{ fmtINR($g['netPL']) }}</b></span>
             @endif
-            {{-- <span class="cust-stat"><small>CTR</small><b>{{ $g['ctr'] !== null ? number_format($g['ctr'], 2) . '%' : '—' }}</b></span> --}}
         </span>
     </button>
     <div class="cust-group-body" id="grp-{{ $gKey }}" hidden>
-    <div class="table-wrap">
-        <table class="ledger dash-table" data-customer="{{ $g['name'] }}">
+    @php $gw = $g['types']['web']; @endphp
+    <div class="table-wrap js-type-pane" data-type="web">
+        <table class="ledger dash-table" data-type="web" data-customer="{{ $g['name'] }}">
                 <thead>
                     <tr>
                         <th data-sort="str" data-col="0">Entry Date <span class="sort-btn">⇅</span></th>
@@ -224,7 +230,7 @@
                     </tr>
                 </thead>
             <tbody>
-            @foreach ($g['rows'] as $ri => $r)
+            @foreach ($gw['rows'] as $ri => $r)
                 @php
                     $cls       = !$r['hasData'] ? 'row-nodata' : (!showMeta() ? '' : ($r['netPL'] >= 0 ? 'row-profit' : 'row-loss'));
                     $campaigns = array_values(array_filter(array_map('trim', explode(',', $r['link']['meta_campaign']))));
@@ -386,18 +392,18 @@
                     <tr>
                         <td colspan="{{ showMeta() ? 3 : 2 }}" style="text-align:left">TOTAL</td>
                         <td></td>
-                        <td class="c-green" style="font-size:11px">${{ number_format($g['gamUSD'], 2) }}</td>
-                        <td class="c-green">{{ fmtINR($g['gamINR']) }}</td>
+                        <td class="c-green" style="font-size:11px">${{ number_format($gw['gamUSD'], 2) }}</td>
+                        <td class="c-green">{{ fmtINR($gw['gamINR']) }}</td>
                         @if (showMeta())
-                        <td class="c-orange">{{ fmtINR($g['meta']) }}<div class="cell-meta-usd" style="font-size:10px;color:var(--text-muted);font-weight:400">{{ fmtUsdFromInr($g['meta'], $usdRate) }}</div></td>
-                        <td class="c-gold">{{ fmtINR($g['gst']) }}</td>
-                        <td>{{ fmtINR($g['cost']) }}</td>
-                        <td class="{{ $g['netPL'] >= 0 ? 'c-green' : 'c-red' }}">{{ fmtINR($g['netPL']) }}</td>
-                        <td class="{{ $g['margin'] >= 0 ? 'c-green' : 'c-red' }}">{{ fmtPct($g['margin']) }}</td>
+                        <td class="c-orange">{{ fmtINR($gw['meta']) }}<div class="cell-meta-usd" style="font-size:10px;color:var(--text-muted);font-weight:400">{{ fmtUsdFromInr($gw['meta'], $usdRate) }}</div></td>
+                        <td class="c-gold">{{ fmtINR($gw['gst']) }}</td>
+                        <td>{{ fmtINR($gw['cost']) }}</td>
+                        <td class="{{ $gw['netPL'] >= 0 ? 'c-green' : 'c-red' }}">{{ fmtINR($gw['netPL']) }}</td>
+                        <td class="{{ $gw['margin'] >= 0 ? 'c-green' : 'c-red' }}">{{ fmtPct($gw['margin']) }}</td>
                         @endif
-                        <td>{{ $g['ctr'] !== null ? number_format($g['ctr'], 2) . '%' : '—' }}</td>
+                        <td>{{ $gw['ctr'] !== null ? number_format($gw['ctr'], 2) . '%' : '—' }}</td>
                         @if (showMeta())
-                        <td><span class="badge-profit">{{ $g['profit'] }} Profit</span> <span class="badge-loss">{{ $g['loss'] }} Loss</span></td>
+                        <td><span class="badge-profit">{{ $gw['profit'] }} Profit</span> <span class="badge-loss">{{ $gw['loss'] }} Loss</span></td>
                         @endif
                         @if (canSeeAllUsers())<td></td>@endif
                         <td></td>
@@ -406,10 +412,101 @@
                 </tfoot>
         </table>
     </div>
+
+    {{-- App subdomains: revenue matched on the App ID --}}
+    @php $ga = $g['types']['app']; @endphp
+    <div class="table-wrap js-type-pane" data-type="app" hidden>
+        <table class="ledger dash-table" data-type="app" data-customer="{{ $g['name'] }}">
+            <thead>
+                <tr>
+                    <th data-sort="str">App ID <span class="sort-btn">⇅</span></th>
+                    <th data-sort="str">App Name <span class="sort-btn">⇅</span></th>
+                    <th data-sort="str">Date <span class="sort-btn">⇅</span></th>
+                    <th data-sort="num">GAM Rev ($) <span class="sort-btn">⇅</span></th>
+                    <th data-sort="num">GAM Revenue (₹) <span class="sort-btn">⇅</span></th>
+                    <th data-sort="num">CTR <span class="sort-btn">⇅</span></th>
+                    @if (canSeeAllUsers())
+                    <th data-sort="str">User <span class="sort-btn">⇅</span></th>
+                    @endif
+                    <th data-sort="str">Notes <span class="sort-btn">⇅</span></th>
+                    <th style="text-align:center;width:80px">Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+            @forelse ($ga['rows'] as $r)
+                @php
+                    $noteVal   = trim((string)($r['link']['notes'] ?? ''));
+                    $entryDate = $r['link']['created_at'] ?? '';
+                @endphp
+            <tr class="{{ $r['hasData'] ? '' : 'row-nodata' }}"
+                data-date="{{ $date }}"
+                data-link-id="{{ (int)$r['link']['id'] }}"
+                data-user-id="{{ (int)($r['link']['user_id'] ?? 0) }}"
+                data-note="{{ $noteVal }}"
+                data-link-name="{{ ($r['link']['app_name'] ?? '') ?: $r['link']['app_id'] }}"
+                data-gam-sites="{{ json_encode($r['gamSites']) }}"
+                data-gam-usd="{{ number_format($r['gamUSD'] ?? 0, 6, '.', '') }}">
+                <td><code style="color:#7dd3fc;font-size:11px;overflow-wrap:anywhere">{{ $r['link']['app_id'] ?: '—' }}</code></td>
+                <td style="color:#fff">{{ ($r['link']['app_name'] ?? '') ?: '—' }}
+                    @if (!$r['link']['active'])
+                    <span style="background:#2e1a1a;color:#f87171;border-radius:10px;font-size:9px;padding:1px 6px;margin-left:3px;vertical-align:middle">Inactive</span>
+                    @endif
+                </td>
+                <td style="color:#c4b5fd;font-size:11px;white-space:nowrap">{{ $entryDate ? date('d M Y', strtotime($entryDate)) : '—' }}</td>
+                @if (!$r['hasData'])
+                <td class="cell-gam-usd c-muted">$0.00</td>
+                <td class="cell-gam-inr c-muted">₹0.00</td>
+                <td class="cell-ctr c-muted">—</td>
+                @else
+                <td class="cell-gam-usd c-green" style="font-size:11px">${{ number_format($r['gamUSD'] ?? 0, 2) }}</td>
+                <td class="cell-gam-inr c-green">{{ fmtINR($r['gamINR']) }}</td>
+                <td class="cell-ctr" title="{{ number_format($r['gamClicks']) }} clicks / {{ number_format($r['gamImpr']) }} impressions">{{ $r['ctr'] !== null ? number_format($r['ctr'], 2) . '%' : '—' }}</td>
+                @endif
+                @if (canSeeAllUsers())
+                <td style="white-space:nowrap">
+                    <span style="background:#1a1a42;border-radius:12px;padding:2px 10px;font-size:11px;color:#7dd3fc">
+                        <i class="bi bi-person" style="font-size:10px"></i> {{ $r['link']['owner_name'] ?? '—' }}
+                    </span>
+                </td>
+                @endif
+                <td style="max-width:170px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="{{ $noteVal }}">
+                    @if ($noteVal !== '')
+                    <span style="background:#1a1a42;color:#c4b5fd;border-radius:10px;padding:2px 8px;font-size:10px">{{ $noteVal }}</span>
+                    @else
+                    <span style="color:var(--text-muted)">—</span>
+                    @endif
+                </td>
+                <td style="text-align:center;white-space:nowrap">
+                    <button type="button" class="btn-row-history" title="Last 30 days history">
+                        <i class="bi bi-clock-history"></i>
+                    </button>
+                    <button class="btn-row-edit" title="Edit GAM Revenue">
+                        <i class="bi bi-pencil-square"></i>
+                    </button>
+                </td>
+            </tr>
+            @empty
+            <tr class="js-empty-row"><td colspan="{{ canSeeAllUsers() ? 9 : 8 }}" style="text-align:center;color:var(--text-muted);padding:18px">No apps for this customer.</td></tr>
+            @endforelse
+            </tbody>
+            <tfoot>
+                <tr>
+                    <td colspan="3" style="text-align:left">TOTAL</td>
+                    <td class="c-green" style="font-size:11px">${{ number_format($ga['gamUSD'], 2) }}</td>
+                    <td class="c-green">{{ fmtINR($ga['gamINR']) }}</td>
+                    <td>{{ $ga['ctr'] !== null ? number_format($ga['ctr'], 2) . '%' : '—' }}</td>
+                    @if (canSeeAllUsers())<td></td>@endif
+                    <td></td>
+                    <td></td>
+                </tr>
+            </tfoot>
+        </table>
+    </div>
     </div>
 </div>
 @endforeach
 </div>
+
 
 {{-- Grand totals row, read by the CSV export (KPI cards show the same figures). --}}
 <table id="dashGrandTotals" hidden>
