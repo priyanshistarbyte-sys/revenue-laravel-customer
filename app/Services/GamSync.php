@@ -556,8 +556,10 @@ class GamSync
             'reportDefinition' => [
                 'dimensions'     => $spec['dimensions'],
                 'metrics'        => $spec['metrics'],
-                'dateRange'      => ['fixedDateRange' => ['startDate' => $date($start), 'endDate' => $date($end)]],
+                'dateRange'      => ['fixed' => ['startDate' => $date($start), 'endDate' => $date($end)]],
                 'reportType'     => 'HISTORICAL',
+                // Ad Exchange metrics reject PROVIDED (custom) time zones; for IST days
+                // set the GAM network's own time zone to IST.
                 'timeZoneSource' => 'PUBLISHER',
             ],
         ];
